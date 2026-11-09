@@ -547,11 +547,13 @@ public class KlaviaturaView extends View {
                         ? upper(k.text) : k.text;
                 // Burçakdagi belgi bölsa — harf biroz pastroqda, belgi kiçik va burçakda:
                 // ular bir-biriga tegmaydi.
-                float shiftDown = k.alt != null ? hintSize * 0.35f : 0f;
+                // Harflar qatorida burçak belgilari körsatilmaydi (bosib turilganda baribir çiqadi).
+                boolean showHint = k.alt != null && symbols;
+                float shiftDown = showHint ? hintSize * 0.35f : 0f;
                 drawRect.offset(0, shiftDown);
                 drawText(canvas, label, letterSize, fg);
                 drawRect.offset(0, -shiftDown);
-                if (k.alt != null) {
+                if (showHint) {
                     Paint.FontMetrics hm = hintPaint.getFontMetrics();
                     canvas.drawText(k.alt, drawRect.right - hintInset,
                             drawRect.top + hintInset - hm.ascent * 0.92f, hintPaint);

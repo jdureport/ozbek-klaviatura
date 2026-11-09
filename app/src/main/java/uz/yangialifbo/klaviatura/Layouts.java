@@ -19,15 +19,6 @@ final class Layouts {
     static final String[] RU_ROWS = {"йцукенгшщзх", "фывапролджэ", "ячсмитьбю"};
 
     private static final String DIGITS = "1234567890";
-    /** Gboard kabi: harflarni bosib turganda çiqadigan belgilar (qator va örin böyiça). */
-    private static final String SYM0 = "%^~|[]<>{}";
-    private static final String SYM1 = "@#$_&-+()";
-    private static final String SYM2 = "*\"':;!?";
-
-    private static String symAt(String sym, int i) {
-        return i < sym.length() ? String.valueOf(sym.charAt(i)) : null;
-    }
-
     static String[] defaultRows(String langId) {
         switch (langId) {
             case Lang.UZ: return UZ_ROWS.clone();
@@ -54,6 +45,7 @@ final class Layouts {
 
     private static String letterAlt(String langId, char c) {
         if (Lang.UZ.equals(langId) && c == 'ç') return "c";
+        if (Lang.UZ.equals(langId) && c == 'v') return "w";
         if (Lang.RU.equals(langId)) {
             if (c == 'ь') return "ъ";
             if (c == 'е') return "ё";
@@ -84,10 +76,8 @@ final class Layouts {
         for (int i = 0; i < rows[0].length(); i++) {
             char ch = rows[0].charAt(i);
             String alt = letterAlt(langId, ch);
-            if (alt == null) {
-                alt = numberRow ? symAt(SYM0, i)
-                        : (i < DIGITS.length() ? String.valueOf(DIGITS.charAt(i)) : null);
-            }
+            // Raqamlar qatori öçiq bölsa — raqamlar 1-harf qatorida bosib turilganda çiqadi.
+            if (alt == null && !numberRow && i < DIGITS.length()) alt = String.valueOf(DIGITS.charAt(i));
             r0.add(Key.ch(String.valueOf(ch), alt, w0));
         }
         out.add(r0);
@@ -95,7 +85,7 @@ final class Layouts {
         for (int i = 0; i < rows[1].length(); i++) {
             char ch = rows[1].charAt(i);
             String alt = letterAlt(langId, ch);
-            r1.add(Key.ch(String.valueOf(ch), alt != null ? alt : symAt(SYM1, i), w));
+            r1.add(Key.ch(String.valueOf(ch), alt, w));
         }
         out.add(r1);
         int n2 = rows[2].length();
@@ -110,7 +100,7 @@ final class Layouts {
         for (int i = 0; i < n2; i++) {
             char ch = rows[2].charAt(i);
             String alt = letterAlt(langId, ch);
-            r2.add(Key.ch(String.valueOf(ch), alt != null ? alt : symAt(SYM2, i), lw));
+            r2.add(Key.ch(String.valueOf(ch), alt, lw));
         }
         r2.add(Key.special(Key.DELETE, "", side));
         out.add(r2);

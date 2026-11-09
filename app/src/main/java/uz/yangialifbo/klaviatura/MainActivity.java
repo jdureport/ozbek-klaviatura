@@ -159,7 +159,7 @@ public class MainActivity extends Activity {
                 {"😊", "Emoji tugmasi — emojilar; bosib tursangiz, boşqa klaviaturaga ötasiz"},
                 {"123", "Bossangiz — belgilar, bosib tursangiz — raqamli klaviatura"},
                 {"⇧", "Ikki marta bossangiz — doimiy boş harf"},
-                {"ç", "Bosib tursangiz — c; boşqa harflarda ham burçakdagi belgi yoziladi"},
+                {"ç v", "Bosib tursangiz: ç → c, v → w"},
                 {"📋", "Takliflar qatorida — oxirgi nusxalangan matnlar"},
                 {"␣␣", "Böş joyni ikki marta bossangiz — nuqta qöyiladi"},
         };
