@@ -33,7 +33,11 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     private static final Map<String, Dictionary> DICTS = new HashMap<>();
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
 
+    /** Luğatsiz tillar (kod rejimi) uçun böş luğat. */
+    private static final Dictionary NONE = new Dictionary("none", false);
+
     static synchronized Dictionary dictionary(Context context, String name) {
+        if (name == null) return NONE;
         Dictionary d = DICTS.get(name);
         if (d == null) {
             d = new Dictionary(name, "uz".equals(name));
@@ -58,10 +62,12 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     }
 
     private final Handler handler = new Handler(Looper.getMainLooper());
+    /** Bosib turilganda takrorlanadigan tugma (⌫, ←, →). */
+    private Key repeatKey;
     private final Runnable repeatDelete = new Runnable() {
         @Override
         public void run() {
-            deleteOne();
+            if (repeatKey != null) repeatAction(repeatKey);
             handler.postDelayed(this, REPEAT_MS);
         }
     };
@@ -79,6 +85,10 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     private boolean suggestOn;      // takliflar körsatiladimi
     private boolean learnOn;        // sözlar eslab qolinadimi
     private boolean forceMultitap;  // parol maydonida T9 luğatsiz
+    /** Raqamli klaviatura: 0 — yöq, 1 — son/sana/kod, 2 — telefon. */
+    private int pad;
+    private boolean padOff;         // foydalanuvçi harflarga ötdi
+    private int builtVersion = -1;  // ranglar va joylaşuv versiyasi
 
     // T9 holati
     private boolean t9Predictive = true;
@@ -103,7 +113,8 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     public View onCreateInputView() {
         view = new KlaviaturaView(this);
         view.setListener(this);
-        selectLang(Prefs.currentLang(this));
+        builtVersion = Prefs.version(this);
+        selectLang(Prefs.currentLang(this), false);
         return view;
     }
 
@@ -124,9 +135,10 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
                 || variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD);
         boolean noSuggest = (info.inputType & InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) != 0;
         boolean textClass = cls == InputType.TYPE_CLASS_TEXT;
-        symbols = cls == InputType.TYPE_CLASS_NUMBER
-                || cls == InputType.TYPE_CLASS_PHONE
-                || cls == InputType.TYPE_CLASS_DATETIME;
+        symbols = false;
+        padOff = false;
+        pad = cls == InputType.TYPE_CLASS_PHONE ? 2
+                : (cls == InputType.TYPE_CLASS_NUMBER || cls == InputType.TYPE_CLASS_DATETIME) ? 1 : 0;
         suggestOn = Prefs.suggestions(this) && textClass && !password && !noSuggest;
         learnOn = suggestOn
                 && variation != InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
@@ -135,9 +147,17 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
         t9Predictive = Prefs.t9Predictive(this);
         shift = KlaviaturaView.SHIFT_OFF;
 
+        // Sozlamalarda ranglar yoki joylaşuv özgargan bölsa — qayta quramiz.
+        int v = Prefs.version(this);
+        if (v != builtVersion) {
+            builtVersion = v;
+            langs.clear();
+            if (view != null) view.applyTheme(Theme.load(this));
+        }
+
         String current = Prefs.currentLang(this);
         if (!Prefs.enabledLangs(this).contains(current)) current = Prefs.enabledLangs(this).get(0);
-        selectLang(current);
+        selectLang(current, false);
         if (view != null) view.setEnterLabel(enterLabel(info));
         updateAutoCaps();
         refreshSuggestions();
@@ -174,16 +194,20 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
 
     // ---- Til ----
 
-    private void selectLang(String id) {
+    private void selectLang(String id, boolean remember) {
         Lang l = langs.get(id);
         if (l == null) {
-            l = Lang.create(id);
+            l = Lang.create(this, id);
             langs.put(id, l);
         }
         lang = l;
         dict = dictionary(this, l.dict);
-        Prefs.setCurrentLang(this, l.id);
+        if (remember) Prefs.setCurrentLang(this, l.id);
         applyLayer();
+    }
+
+    private boolean inPad() {
+        return pad != 0 && !padOff;
     }
 
     private void nextLang() {
@@ -194,13 +218,19 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
             return;
         }
         int i = enabled.indexOf(lang.id);
-        selectLang(enabled.get((i + 1) % enabled.size()));
+        String next = enabled.get((i + 1) % enabled.size());
+        selectLang(next, true);
+        EditorInfo ei = getCurrentInputEditorInfo();
+        boolean textField = ei != null && (ei.inputType & InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_TEXT;
+        suggestOn = Prefs.suggestions(this) && textField && !forceMultitap
+                && (ei.inputType & InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) == 0;
+        learnOn = suggestOn;
         updateAutoCaps();
         refreshSuggestions();
     }
 
     private boolean t9Layout() {
-        return lang.t9 && !symbols;
+        return lang.t9 && !symbols && !inPad();
     }
 
     private boolean predictive() {
@@ -211,8 +241,9 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
 
     @Override
     public void onKeyDown(Key key) {
-        if (key.type == Key.DELETE) {
-            deleteOne();
+        if (key.type == Key.DELETE || key.type == Key.LEFT || key.type == Key.RIGHT) {
+            repeatAction(key);
+            repeatKey = key;
             handler.removeCallbacks(repeatDelete);
             handler.postDelayed(repeatDelete, REPEAT_START_MS);
         }
@@ -220,7 +251,19 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
 
     @Override
     public void onKeyUp(Key key) {
-        if (key.type == Key.DELETE) handler.removeCallbacks(repeatDelete);
+        if (key == repeatKey) {
+            handler.removeCallbacks(repeatDelete);
+            repeatKey = null;
+        }
+    }
+
+    private void repeatAction(Key key) {
+        if (key.type == Key.DELETE) {
+            deleteOne();
+        } else {
+            finishComposing();
+            sendDownUpKeyEvents(key.type == Key.LEFT ? KeyEvent.KEYCODE_DPAD_LEFT : KeyEvent.KEYCODE_DPAD_RIGHT);
+        }
     }
 
     @Override
@@ -244,6 +287,7 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
                 break;
             case Key.TO_LETTERS:
                 symbols = false;
+                padOff = true;
                 applyLayer();
                 updateAutoCaps();
                 refreshSuggestions();
@@ -305,10 +349,10 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     // ---- Oddiy klaviatura ----
 
     private void typeChar(String text) {
-        boolean letter = text.length() == 1 && lang.isWordChar(text.charAt(0)) && !symbols;
+        boolean letter = text.length() == 1 && lang.isWordChar(text.charAt(0)) && !symbols && !inPad();
         if (!letter) learnWordBeforeCursor();
         String t = text;
-        if (!symbols && shift != KlaviaturaView.SHIFT_OFF) t = lang.upper(t);
+        if (!symbols && !inPad() && shift != KlaviaturaView.SHIFT_OFF) t = lang.upper(t);
         commit(t);
         if (shift == KlaviaturaView.SHIFT_ONCE) setShift(KlaviaturaView.SHIFT_OFF);
     }
@@ -546,7 +590,11 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
 
     private void applyLayer() {
         if (view == null || lang == null) return;
-        view.setRows(symbols ? lang.symbols : lang.letters, symbols, lang);
+        if (inPad()) {
+            view.setRows(pad == 2 ? lang.phonePad : lang.numberPad, true, lang);
+        } else {
+            view.setRows(symbols ? lang.symbols : lang.letters, symbols, lang);
+        }
         view.setShiftState(shift);
         view.setSpaceLabel(lang.label);
         view.setModeLabel(predictive() ? "T9" : "abc");
@@ -559,6 +607,7 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
 
     private void updateAutoCaps() {
         if (symbols || shift == KlaviaturaView.SHIFT_LOCK || isComposing()) return;
+        if (inPad()) return;
         EditorInfo ei = getCurrentInputEditorInfo();
         InputConnection ic = getCurrentInputConnection();
         if (ei == null || ic == null || ei.inputType == InputType.TYPE_NULL) return;
@@ -622,7 +671,7 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
         learnWordBeforeCursor();
         long now = SystemClock.uptimeMillis();
         boolean done = false;
-        if (!symbols && now - lastSpaceTap < 700) {
+        if (!symbols && !inPad() && now - lastSpaceTap < 700) {
             CharSequence before = ic.getTextBeforeCursor(2, 0);
             if (before != null && before.length() == 2 && before.charAt(1) == ' '
                     && Character.isLetterOrDigit(before.charAt(0))) {

@@ -38,13 +38,7 @@ public class KlaviaturaView extends View {
 
     private static final long LONG_PRESS_MS = 380;
 
-    /** Ranglar — yoruğ va qorönği mavzu. */
-    private static final class Palette {
-        int background, key, specialKey, pressed, specialPressed, shadow,
-                text, hint, accent, accentPressed, onAccent;
-    }
-
-    private final Palette c = new Palette();
+    private Theme c;
     private final Paint keyPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint hintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -127,33 +121,7 @@ public class KlaviaturaView extends View {
         }
         stripPaint.setStrokeWidth(dp(dm, 1));
 
-        boolean night = (getResources().getConfiguration().uiMode
-                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-        if (night) {
-            c.background = 0xFF17181B;
-            c.key = 0xFF33353A;
-            c.specialKey = 0xFF24262A;
-            c.pressed = 0xFF4A4D54;
-            c.specialPressed = 0xFF3A3D43;
-            c.shadow = 0xFF0C0D0F;
-            c.text = 0xFFF1F2F4;
-            c.hint = 0xFF9095A0;
-            c.accent = 0xFF23A3AE;
-            c.accentPressed = 0xFF1B858E;
-            c.onAccent = 0xFF04282B;
-        } else {
-            c.background = 0xFFE6E8EC;
-            c.key = 0xFFFFFFFF;
-            c.specialKey = 0xFFC8CDD5;
-            c.pressed = 0xFFD9DDE3;
-            c.specialPressed = 0xFFAEB4BE;
-            c.shadow = 0xFFA9AFB8;
-            c.text = 0xFF1A1C20;
-            c.hint = 0xFF7C828C;
-            c.accent = 0xFF0E7C86;
-            c.accentPressed = 0xFF0A626A;
-            c.onAccent = 0xFFFFFFFF;
-        }
+        c = Theme.load(context);
 
         textPaint.setTextAlign(Paint.Align.CENTER);
         textPaint.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
@@ -211,6 +179,13 @@ public class KlaviaturaView extends View {
     }
 
     // ---- Holatni özgartiriş ----
+
+    /** Ranglarni yangilaş (sozlamalar özgarganda yoki oldindan körişda). */
+    public void applyTheme(Theme theme) {
+        c = theme;
+        hintPaint.setColor(c.hint);
+        invalidate();
+    }
 
     public void setListener(Listener l) {
         listener = l;
@@ -436,6 +411,7 @@ public class KlaviaturaView extends View {
                 break;
             case Key.SPACE:
                 if (!symbols) drawText(canvas, spaceLabel, spaceSize, c.hint);
+                else if (!k.text.trim().isEmpty()) drawText(canvas, k.text, specialSize, c.hint);
                 break;
             case Key.LANG:
                 iconPaint.setStyle(Paint.Style.STROKE);

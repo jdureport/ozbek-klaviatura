@@ -9,90 +9,138 @@ final class Layouts {
 
     private Layouts() {}
 
-    /**
-     * Özbekça (2026-yilgi lotin alifbosi): 28 harf + ʼ.
-     *   q ş e r t y u i o ö p
-     *    a s d f g ğ h j k l
-     *   ⇧ z x ç v b n m ʼ ⌫
-     */
-    static List<List<Key>> uzbek() {
-        List<List<Key>> rows = new ArrayList<>();
-        rows.add(row(
-                Key.ch("q", "1"), Key.ch("ş", "2"), Key.ch("e", "3"), Key.ch("r", "4"),
-                Key.ch("t", "5"), Key.ch("y", "6"), Key.ch("u", "7"), Key.ch("i", "8"),
-                Key.ch("o", "9"), Key.ch("ö", "0"), Key.ch("p")));
-        rows.add(row(
-                Key.ch("a"), Key.ch("s"), Key.ch("d"), Key.ch("f"), Key.ch("g"),
-                Key.ch("ğ"), Key.ch("h"), Key.ch("j"), Key.ch("k"), Key.ch("l")));
-        rows.add(row(
-                Key.special(Key.SHIFT, "", 1.5f),
-                Key.ch("z"), Key.ch("x"), Key.ch("ç"), Key.ch("v"),
-                Key.ch("b"), Key.ch("n"), Key.ch("m"), Key.ch("ʼ"),
-                Key.special(Key.DELETE, "", 1.5f)));
-        rows.add(bottomRow("?123", 11));
-        return rows;
+    // ---- Harf qatorlari (foydalanuvçi joylarini özgartira oladi) ----
+
+    /** Özbekça (2026-yilgi lotin alifbosi): 28 harf + ʼ. */
+    static final String[] UZ_ROWS = {"qşertyuioöp", "asdfgğhjkl", "zxçvbnmʼ"};
+    /** Qoraqalpoqça (2016-yilgi lotin alifbosi): 32 harf; sh, ch — ikki harf bilan. */
+    static final String[] KAA_ROWS = {"qwertyuúiıop", "aásdfgǵhjkl", "zxcvbnńmó"};
+    static final String[] EN_ROWS = {"qwertyuiop", "asdfghjkl", "zxcvbnm'"};
+    static final String[] RU_ROWS = {"йцукенгшщзх", "фывапролджэ", "ячсмитьбю"};
+
+    private static final String DIGITS = "1234567890";
+
+    static String[] defaultRows(String langId) {
+        switch (langId) {
+            case Lang.UZ: return UZ_ROWS.clone();
+            case Lang.KAA: return KAA_ROWS.clone();
+            case Lang.EN: return EN_ROWS.clone();
+            case Lang.RU: return RU_ROWS.clone();
+            default: return null;
+        }
+    }
+
+    /** Joylaşuvini özgartiriş mumkin bölgan tillar. */
+    static final String[] EDITABLE = {Lang.UZ, Lang.KAA, Lang.EN, Lang.RU};
+
+    /** Qatorlar asl joylaşuvdagi harflarning aynan özi (faqat joyi boşqa) ekanini tekşiradi. */
+    static boolean isPermutation(String[] def, String[] rows) {
+        if (rows == null || rows.length != def.length) return false;
+        for (int i = 0; i < def.length; i++) if (rows[i].length() != def[i].length()) return false;
+        char[] a = String.join("", def).toCharArray();
+        char[] b = String.join("", rows).toCharArray();
+        Arrays.sort(a);
+        Arrays.sort(b);
+        return Arrays.equals(a, b);
+    }
+
+    private static String letterAlt(String langId, char c) {
+        if (Lang.RU.equals(langId)) {
+            if (c == 'ь') return "ъ";
+            if (c == 'е') return "ё";
+        }
+        return null;
     }
 
     /**
-     * Qoraqalpoqça (2016-yilgi lotin alifbosi): 32 harf, sh va ch — ikki harf bilan.
-     *   q w e r t y u ú i ı o p
-     *    a á s d f g ǵ h j k l
-     *   ⇧ z x c v b n ń m ó ⌫
+     * Harf qatorlaridan töliq joylaşuv quriş:
+     * 1-qatorda raqamlar (bosib turilsa), 3-qatorda ⇧ va ⌫, pastda umumiy qator.
      */
-    static List<List<Key>> karakalpak() {
+    static List<List<Key>> letters(String langId, String[] rows) {
+        float w = Lang.EN.equals(langId) ? 1.1f : 1f;
+        List<List<Key>> out = new ArrayList<>();
+        List<Key> r0 = new ArrayList<>();
+        for (int i = 0; i < rows[0].length(); i++) {
+            char ch = rows[0].charAt(i);
+            String alt = i < DIGITS.length() ? String.valueOf(DIGITS.charAt(i)) : letterAlt(langId, ch);
+            r0.add(Key.ch(String.valueOf(ch), alt, w));
+        }
+        out.add(r0);
+        List<Key> r1 = new ArrayList<>();
+        for (int i = 0; i < rows[1].length(); i++) {
+            char ch = rows[1].charAt(i);
+            r1.add(Key.ch(String.valueOf(ch), letterAlt(langId, ch), w));
+        }
+        out.add(r1);
+        float total = Math.max(rows[0].length(), rows[1].length()) * w;
+        int n2 = rows[2].length();
+        float side = (total - n2) / 2f;
+        float lw = 1f;
+        if (side < 1f) {
+            side = 1f;
+            lw = (total - 2f) / n2;
+        }
+        List<Key> r2 = new ArrayList<>();
+        r2.add(Key.special(Key.SHIFT, "", side));
+        for (int i = 0; i < n2; i++) {
+            char ch = rows[2].charAt(i);
+            r2.add(Key.ch(String.valueOf(ch), letterAlt(langId, ch), lw));
+        }
+        r2.add(Key.special(Key.DELETE, "", side));
+        out.add(r2);
+        out.add(bottomRow("?123", total));
+        return out;
+    }
+
+    /**
+     * Raqam maydonlari (son, sana, PIN, SMS-kod):
+     *   +  1 2 3  ⌫
+     *   -  4 5 6  ␣
+     *   /  7 8 9  ↵
+     *   ABD , 0 .  *
+     */
+    static List<List<Key>> numberPad(String abcLabel) {
+        float d = 1.3f;
         List<List<Key>> rows = new ArrayList<>();
-        rows.add(row(
-                Key.ch("q", "1"), Key.ch("w", "2"), Key.ch("e", "3"), Key.ch("r", "4"),
-                Key.ch("t", "5"), Key.ch("y", "6"), Key.ch("u", "7"), Key.ch("ú"),
-                Key.ch("i", "8"), Key.ch("ı"), Key.ch("o", "9"), Key.ch("p", "0")));
-        rows.add(row(
-                Key.ch("a"), Key.ch("á"), Key.ch("s"), Key.ch("d"), Key.ch("f"), Key.ch("g"),
-                Key.ch("ǵ"), Key.ch("h"), Key.ch("j"), Key.ch("k"), Key.ch("l")));
-        rows.add(row(
-                Key.special(Key.SHIFT, "", 1.5f),
-                Key.ch("z"), Key.ch("x"), Key.ch("c"), Key.ch("v"), Key.ch("b"),
-                Key.ch("n"), Key.ch("ń"), Key.ch("m"), Key.ch("ó"),
-                Key.special(Key.DELETE, "", 1.5f)));
-        rows.add(bottomRow("?123", 12));
+        rows.add(row(Key.ch("+", "±"), Key.ch("1", null, d), Key.ch("2", null, d), Key.ch("3", null, d),
+                Key.special(Key.DELETE, "", 1.2f)));
+        rows.add(row(Key.ch("-", "−"), Key.ch("4", null, d), Key.ch("5", null, d), Key.ch("6", null, d),
+                Key.special(Key.SPACE, "␣", 1.2f)));
+        rows.add(row(Key.ch("/", ":"), Key.ch("7", null, d), Key.ch("8", null, d), Key.ch("9", null, d),
+                Key.special(Key.ENTER, "", 1.2f)));
+        rows.add(row(Key.special(Key.TO_LETTERS, abcLabel, 1f), Key.ch(",", null, d), Key.ch("0", null, d),
+                Key.ch(".", null, d), Key.ch("*", "#", 1.2f)));
         return rows;
     }
 
-    static List<List<Key>> english() {
-        float w = 1.1f;
+    /**
+     * Telefon raqami maydonlari:
+     *   (  1 2 3  ⌫
+     *   )  4 5 6  ␣
+     *   -  7 8 9  ↵
+     *   ABD * 0 #  +
+     */
+    static List<List<Key>> phonePad(String abcLabel) {
+        float d = 1.3f;
         List<List<Key>> rows = new ArrayList<>();
-        rows.add(row(
-                Key.ch("q", "1", w), Key.ch("w", "2", w), Key.ch("e", "3", w), Key.ch("r", "4", w),
-                Key.ch("t", "5", w), Key.ch("y", "6", w), Key.ch("u", "7", w), Key.ch("i", "8", w),
-                Key.ch("o", "9", w), Key.ch("p", "0", w)));
-        rows.add(row(
-                Key.ch("a", null, w), Key.ch("s", null, w), Key.ch("d", null, w), Key.ch("f", null, w),
-                Key.ch("g", null, w), Key.ch("h", null, w), Key.ch("j", null, w), Key.ch("k", null, w),
-                Key.ch("l", null, w)));
-        rows.add(row(
-                Key.special(Key.SHIFT, "", 1.5f),
-                Key.ch("z"), Key.ch("x"), Key.ch("c"), Key.ch("v"),
-                Key.ch("b"), Key.ch("n"), Key.ch("m"), Key.ch("'"),
-                Key.special(Key.DELETE, "", 1.5f)));
-        rows.add(bottomRow("?123", 11));
+        rows.add(row(Key.ch("("), Key.ch("1", null, d), Key.ch("2", null, d), Key.ch("3", null, d),
+                Key.special(Key.DELETE, "", 1.2f)));
+        rows.add(row(Key.ch(")"), Key.ch("4", null, d), Key.ch("5", null, d), Key.ch("6", null, d),
+                Key.special(Key.SPACE, "␣", 1.2f)));
+        rows.add(row(Key.ch("-"), Key.ch("7", null, d), Key.ch("8", null, d), Key.ch("9", null, d),
+                Key.special(Key.ENTER, "", 1.2f)));
+        rows.add(row(Key.special(Key.TO_LETTERS, abcLabel, 1f), Key.ch("*", null, d), Key.ch("0", "+", d),
+                Key.ch("#", null, d), Key.ch("+", null, 1.2f)));
         return rows;
     }
 
-    static List<List<Key>> russian() {
-        List<List<Key>> rows = new ArrayList<>();
-        rows.add(row(
-                Key.ch("й", "1"), Key.ch("ц", "2"), Key.ch("у", "3"), Key.ch("к", "4"),
-                Key.ch("е", "5"), Key.ch("н", "6"), Key.ch("г", "7"), Key.ch("ш", "8"),
-                Key.ch("щ", "9"), Key.ch("з", "0"), Key.ch("х")));
-        rows.add(row(
-                Key.ch("ф"), Key.ch("ы"), Key.ch("в"), Key.ch("а"), Key.ch("п"), Key.ch("р"),
-                Key.ch("о"), Key.ch("л"), Key.ch("д"), Key.ch("ж"), Key.ch("э")));
-        rows.add(row(
-                Key.special(Key.SHIFT, "", 1f),
-                Key.ch("я"), Key.ch("ч"), Key.ch("с"), Key.ch("м"), Key.ch("и"),
-                Key.ch("т"), Key.ch("ь", "ъ"), Key.ch("б"), Key.ch("ю", "ё"),
-                Key.special(Key.DELETE, "", 1f)));
-        rows.add(bottomRow("?123", 11));
-        return rows;
+    private static List<Key> charRow(String chars, String alts, float w) {
+        List<Key> r = new ArrayList<>();
+        for (int i = 0; i < chars.length(); i++) {
+            char a = i < alts.length() ? alts.charAt(i) : ' ';
+            r.add(Key.ch(String.valueOf(chars.charAt(i)), a == ' ' ? null : String.valueOf(a), w));
+        }
+        return r;
     }
 
     /**
@@ -123,19 +171,11 @@ final class Layouts {
     static List<List<Key>> symbols(String abcLabel) {
         List<List<Key>> rows = new ArrayList<>();
         float w = 1.1f;
-        rows.add(row(
-                Key.ch("1", null, w), Key.ch("2", null, w), Key.ch("3", null, w), Key.ch("4", null, w),
-                Key.ch("5", null, w), Key.ch("6", null, w), Key.ch("7", null, w), Key.ch("8", null, w),
-                Key.ch("9", null, w), Key.ch("0", null, w)));
-        rows.add(row(
-                Key.ch("@", "~", w), Key.ch("#", "№", w), Key.ch("$", "€", w), Key.ch("%", "^", w),
-                Key.ch("&", "|", w), Key.ch("-", "_", w), Key.ch("+", "=", w), Key.ch("(", "[", w),
-                Key.ch(")", "]", w), Key.ch("/", "\\", w)));
-        rows.add(row(
-                Key.ch("*", "`"), Key.ch("\"", "{"), Key.ch("'", "}"), Key.ch(":", "<"),
-                Key.ch(";", ">"), Key.ch("!", "¡"), Key.ch("?", "¿"), Key.ch("«", "“"),
-                Key.ch("»", "”"),
-                Key.special(Key.DELETE, "", 2f)));
+        rows.add(charRow("1234567890", "", w));
+        rows.add(charRow("@#$%&-+()/", "~№€^|_=[]\\", w));
+        List<Key> r2 = charRow("*\"':;!?«»", "`{}<>¡¿“”", 1f);
+        r2.add(Key.special(Key.DELETE, "", 2f));
+        rows.add(r2);
         List<Key> bottom = bottomRow(abcLabel, 11);
         bottom.set(0, Key.special(Key.TO_LETTERS, abcLabel, 1.25f));
         rows.add(bottom);

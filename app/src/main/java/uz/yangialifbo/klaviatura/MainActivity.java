@@ -1,6 +1,7 @@
 package uz.yangialifbo.klaviatura;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Typeface;
@@ -15,6 +16,8 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.Toast;
 import android.widget.EditText;
+import android.widget.GridLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -25,6 +28,10 @@ public class MainActivity extends Activity {
     private TextView status;
     private float density;
     private boolean night;
+    private int textColor, mutedColor;
+    private KlaviaturaView preview;
+    private final View[] colorChips = new View[4];
+    private LinearLayout presetRow;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,8 +39,8 @@ public class MainActivity extends Activity {
         density = getResources().getDisplayMetrics().density;
         night = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
                 == Configuration.UI_MODE_NIGHT_YES;
-        int textColor = night ? 0xFFF1F2F4 : 0xFF1A1C20;
-        int mutedColor = night ? 0xFF9095A0 : 0xFF5E646E;
+        textColor = night ? 0xFFF1F2F4 : 0xFF1A1C20;
+        mutedColor = night ? 0xFF9095A0 : 0xFF5E646E;
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFitsSystemWindows(true);
@@ -110,11 +117,64 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "Örganilgan sözlar öçirildi", Toast.LENGTH_SHORT).show();
         }));
 
+        // ---- Ranglar ----
+        col.addView(step("Ranglar", textColor));
+        preview = new KlaviaturaView(this);
+        preview.setRows(Lang.create(this, Lang.UZ).letters, false, Lang.create(this, Lang.UZ));
+        preview.setSuggestions(java.util.Arrays.asList("salom", "salomat", "salomlar"));
+        preview.setEnabled(false);
+        preview.setClickable(false);
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        plp.bottomMargin = px(12);
+        col.addView(preview, plp);
+
+        HorizontalScrollView hs = new HorizontalScrollView(this);
+        hs.setHorizontalScrollBarEnabled(false);
+        presetRow = new LinearLayout(this);
+        hs.addView(presetRow);
+        col.addView(hs);
+        for (int i = 0; i < Theme.PRESET_IDS.length; i++) {
+            final String id = Theme.PRESET_IDS[i];
+            Button b = button(Theme.PRESET_NAMES[i], v -> {
+                Theme.setPreset(this, id);
+                refreshTheme();
+            });
+            b.setTag(id);
+            presetRow.addView(b);
+        }
+
+        String[] colorNames = {"Fon", "Tugmalar", "Harflar", "Urğu rangi"};
+        for (int i = 0; i < 4; i++) {
+            final int which = i;
+            LinearLayout row = new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(0, px(10), 0, px(10));
+            View chip = new View(this);
+            colorChips[i] = chip;
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(px(36), px(36));
+            clp.rightMargin = px(14);
+            row.addView(chip, clp);
+            TextView name = text(colorNames[i], 16, textColor);
+            row.addView(name);
+            row.setOnClickListener(v -> pickColor(which, colorNames[which]));
+            col.addView(row);
+        }
+        refreshTheme();
+
+        // ---- Harf joylari ----
+        col.addView(step("Harf joylari", textColor));
+        col.addView(text("Har bir til uçun harflarning joyini özingizga qulay qilib almaştiring.",
+                14, mutedColor));
+        col.addView(button("Joylaşuvni tahrirlaş", v ->
+                startActivity(new Intent(this, LayoutEditorActivity.class))));
+
         TextView tips = text(
                 "Maslahatlar\n"
                         + "• ⇧ tugmasini ikki marta bossangiz — doimiy boş harf.\n"
                         + "• Yuqori qatordagi harfni bosib tursangiz — raqam yoziladi.\n"
                         + "• Böş joyni ikki marta bossangiz — nuqta qöyiladi.\n"
+                        + "• Raqam, telefon va SMS-kod maydonlarida katta raqamli klaviatura özi oçiladi.\n"
                         + "• 🌐 yoki böş joyni bosib tursangiz — boşqa klaviaturaga ötasiz.\n"
                         + "• T9: har harf uçun tugmani bir marta bosing, söz özi topiladi. "
                         + "Luğatda yöq sözni yoziş uçun pastki öng tugma bilan «abc» rejimiga öting.\n"
@@ -167,6 +227,78 @@ public class MainActivity extends Activity {
         else if (enabled) s = "✓ Klaviatura yoqilgan. Endi uni tanlang (2-qadam).";
         else s = "Klaviatura hali yoqilmagan (1-qadam).";
         status.setText(s);
+    }
+
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+        if (preview != null) {
+            Lang uz = Lang.create(this, Lang.UZ);
+            preview.setRows(uz.letters, false, uz);
+        }
+    }
+
+    private void refreshTheme() {
+        Theme t = Theme.load(this);
+        preview.applyTheme(t);
+        for (int i = 0; i < 4; i++) {
+            GradientDrawable d = new GradientDrawable();
+            d.setShape(GradientDrawable.OVAL);
+            d.setColor(t.base(i));
+            d.setStroke(px(1), mutedColor);
+            colorChips[i].setBackground(d);
+        }
+        String mode = Theme.mode(this);
+        for (int i = 0; i < presetRow.getChildCount(); i++) {
+            View b = presetRow.getChildAt(i);
+            b.setAlpha(mode.equals(b.getTag()) ? 1f : 0.55f);
+        }
+    }
+
+    /** Rang tanlaş oynasi: tayyor ranglar va HEX kod. */
+    private void pickColor(int which, String title) {
+        Theme t = Theme.load(this);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(px(20), px(12), px(20), 0);
+        GridLayout grid = new GridLayout(this);
+        grid.setColumnCount(5);
+        EditText hex = new EditText(this);
+        hex.setText(Theme.hex(t.base(which)));
+        hex.setSingleLine(true);
+        for (int color : Theme.SWATCHES) {
+            View sw = new View(this);
+            GradientDrawable d = new GradientDrawable();
+            d.setShape(GradientDrawable.OVAL);
+            d.setColor(color);
+            d.setStroke(px(1), 0xFF8A8F99);
+            sw.setBackground(d);
+            GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
+            lp.width = px(40);
+            lp.height = px(40);
+            lp.setMargins(px(6), px(6), px(6), px(6));
+            sw.setOnClickListener(v -> hex.setText(Theme.hex(color)));
+            grid.addView(sw, lp);
+        }
+        box.addView(grid);
+        TextView hint = text("HEX kod (masalan, #0E7C86):", 14, 0xFF8A8F99);
+        hint.setPadding(0, px(12), 0, 0);
+        box.addView(hint);
+        box.addView(hex);
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setView(box)
+                .setPositiveButton("Tayyor", (d, w) -> {
+                    Integer c = Theme.parseHex(hex.getText().toString());
+                    if (c == null) {
+                        Toast.makeText(this, "HEX kod nötöğri", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    Theme.setColor(this, which, c);
+                    refreshTheme();
+                })
+                .setNegativeButton("Bekor qiliş", null)
+                .show();
     }
 
     private TextView text(String s, float sizeSp, int color) {

@@ -23,6 +23,9 @@ Har bir özgarişdan keyin GitHub Actions APK'ni avtomatik yiğadi. Tayyor fayln
 - Yoruğ va qorönği mavzu
 - Tillar: özbekça, özbekça T9, qoraqalpoqça, inglizça, rusça (🌐 tugmasi)
 - Söz takliflari va yangi sözlarni eslab qoliş
+- Raqam, telefon va SMS-kod maydonlari uçun katta raqamli klaviatura
+- Ranglarni tanlaş: tayyor mavzular va maxsus ranglar
+- Harf joylarini özgartiriş (har bir til uçun)
 
 ## Luğatlar
 

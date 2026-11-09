@@ -1,5 +1,7 @@
 package uz.yangialifbo.klaviatura;
 
+import android.content.Context;
+
 import java.util.List;
 import java.util.Locale;
 
@@ -22,11 +24,13 @@ final class Lang {
     final String settingsName;
     /** Belgilardan harflarga qaytiş tugmasi. */
     final String abc;
-    /** Luğat fayli (assets/dict/...). */
+    /** Luğat fayli (assets/dict/...); null — luğatsiz. */
     final String dict;
     final boolean t9;
     final List<List<Key>> letters;
     final List<List<Key>> symbols;
+    final List<List<Key>> numberPad;
+    final List<List<Key>> phonePad;
 
     private Lang(String id, String label, String settingsName, String abc, String dict,
                  boolean t9, List<List<Key>> letters) {
@@ -38,21 +42,28 @@ final class Lang {
         this.t9 = t9;
         this.letters = letters;
         this.symbols = Layouts.symbols(abc);
+        String letterLabel = t9 ? "T9" : abc;
+        this.numberPad = Layouts.numberPad(letterLabel);
+        this.phonePad = Layouts.phonePad(letterLabel);
     }
 
-    static Lang create(String id) {
+    static Lang create(Context c, String id) {
         switch (id) {
             case UZ_T9:
                 return new Lang(UZ_T9, "Özbek T9", "Özbekça T9 (12 tugma)", "T9", "uz", true, Layouts.uzT9());
             case KAA:
-                return new Lang(KAA, "Qaraqalpaqsha", "Qoraqalpoqça", "ABD", "kaa", false, Layouts.karakalpak());
+                return new Lang(KAA, "Qaraqalpaqsha", "Qoraqalpoqça", "ABD", "kaa", false,
+                        Layouts.letters(KAA, Prefs.layoutRows(c, KAA)));
             case EN:
-                return new Lang(EN, "English", "Inglizça", "ABC", "en", false, Layouts.english());
+                return new Lang(EN, "English", "Inglizça", "ABC", "en", false,
+                        Layouts.letters(EN, Prefs.layoutRows(c, EN)));
             case RU:
-                return new Lang(RU, "Русский", "Rusça", "АБВ", "ru", false, Layouts.russian());
+                return new Lang(RU, "Русский", "Rusça", "АБВ", "ru", false,
+                        Layouts.letters(RU, Prefs.layoutRows(c, RU)));
             case UZ:
             default:
-                return new Lang(UZ, "Özbek", "Özbekça", "ABD", "uz", false, Layouts.uzbek());
+                return new Lang(UZ, "Özbek", "Özbekça", "ABD", "uz", false,
+                        Layouts.letters(UZ, Prefs.layoutRows(c, UZ)));
         }
     }
 

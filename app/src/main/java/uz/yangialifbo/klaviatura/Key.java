@@ -19,6 +19,10 @@ public final class Key {
     public static final int T9MODE = 9;
     /** Takliflar qatoridagi katak. */
     public static final int SUGGESTION = 10;
+    /** Kod rejimi: Tab va kursorni çapga / öngga suriş. */
+    public static final int TAB = 11;
+    public static final int LEFT = 12;
+    public static final int RIGHT = 13;
 
     public final int type;
     /** Tugmada körinadigan va yoziladigan matn. */

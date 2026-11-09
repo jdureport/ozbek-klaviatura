@@ -18,6 +18,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".LayoutEditorActivity"
+            android:exported="false"
+            android:label="Harf joylari" />
+
         <service
             android:name=".KlaviaturaService"
             android:exported="true"
