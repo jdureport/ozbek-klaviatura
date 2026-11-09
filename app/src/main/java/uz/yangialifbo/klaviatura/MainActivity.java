@@ -119,7 +119,7 @@ public class MainActivity extends Activity {
                         + "• T9: har harf uçun tugmani bir marta bosing, söz özi topiladi. "
                         + "Luğatda yöq sözni yoziş uçun pastki öng tugma bilan «abc» rejimiga öting.\n"
                         + "• Klaviatura siz yozgan sözlarni faqat şu telefonda eslab qoladi, "
-                        + "hech qayerga yubormaydi.",
+                        + "heç qayerga yubormaydi.",
                 15, mutedColor);
         tips.setPadding(0, px(24), 0, 0);
         tips.setLineSpacing(px(4), 1f);
