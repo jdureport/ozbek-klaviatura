@@ -1,6 +1,12 @@
 package uz.yangialifbo.klaviatura;
 
+import android.content.ClipData;
+import android.content.ClipDescription;
+import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
+import android.os.Build;
+import android.os.PersistableBundle;
 import android.inputmethodservice.InputMethodService;
 import android.os.Handler;
 import android.os.Looper;
@@ -107,7 +113,101 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     /** Takliflar qatoridagi sözlar (kiçik harfda). */
     private List<String> shownRaw = new ArrayList<>();
 
+    // ---- Bufer (nusxalangan matnlar faqat xotirada, diskka yozilmaydi) ----
+    private static final int CLIP_MAX = 20;
+    private final java.util.LinkedList<String> clips = new java.util.LinkedList<>();
+    private ClipboardManager clipboard;
+    private boolean clipMode;
+    private final ClipboardManager.OnPrimaryClipChangedListener clipListener = this::captureClip;
+
     // ---- Hayot sikli ----
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (clipboard != null) clipboard.addPrimaryClipChangedListener(clipListener);
+    }
+
+    @Override
+    public void onDestroy() {
+        if (clipboard != null) clipboard.removePrimaryClipChangedListener(clipListener);
+        super.onDestroy();
+    }
+
+    /** Joriy buferdagi matnni röyxatga qöşiş (parol kabi maxfiy belgilangan matnlardan taşqari). */
+    private void captureClip() {
+        if (clipboard == null) return;
+        try {
+            ClipData clip = clipboard.getPrimaryClip();
+            if (clip == null || clip.getItemCount() == 0) return;
+            ClipDescription desc = clip.getDescription();
+            if (desc != null && Build.VERSION.SDK_INT >= 24) {
+                PersistableBundle extras = desc.getExtras();
+                if (extras != null && extras.getBoolean("android.content.extra.IS_SENSITIVE", false)) return;
+            }
+            CharSequence t = clip.getItemAt(0).coerceToText(this);
+            if (t == null) return;
+            String s = t.toString();
+            if (s.trim().isEmpty()) return;
+            clips.remove(s);
+            clips.addFirst(s);
+            while (clips.size() > CLIP_MAX) clips.removeLast();
+        } catch (RuntimeException ignored) {
+            // bufer öqib bölmasa — eʼtiborsiz
+        }
+    }
+
+    private List<List<Key>> clipRows() {
+        captureClip();
+        List<List<Key>> rows = new ArrayList<>();
+        int shown = Math.min(6, clips.size());
+        if (shown == 0) {
+            Key empty = new Key(Key.CLIP, "Bufer böş — biror matnni nusxalang", null, 2f);
+            empty.index = -1;
+            List<Key> r = new ArrayList<>();
+            r.add(empty);
+            rows.add(r);
+            rows.add(new ArrayList<>(java.util.Collections.singletonList(blankClip())));
+            rows.add(new ArrayList<>(java.util.Collections.singletonList(blankClip())));
+        } else {
+            for (int r = 0; r < 3; r++) {
+                List<Key> row = new ArrayList<>();
+                for (int c = 0; c < 2; c++) {
+                    int i = r * 2 + c;
+                    if (i < shown) {
+                        Key k = new Key(Key.CLIP, clips.get(i), null, 1f);
+                        k.index = i;
+                        row.add(k);
+                    } else {
+                        Key k = new Key(Key.CLIP, "", null, 1f);
+                        k.index = -1;
+                        row.add(k);
+                    }
+                }
+                rows.add(row);
+            }
+        }
+        List<Key> bottom = new ArrayList<>();
+        bottom.add(Key.special(Key.TO_LETTERS, lang.t9 ? "T9" : lang.abc, 1f));
+        bottom.add(Key.special(Key.CLIP_CLEAR, "Tozalaş", 1f));
+        rows.add(bottom);
+        return rows;
+    }
+
+    private static Key blankClip() {
+        Key k = new Key(Key.CLIP, "", null, 2f);
+        k.index = -1;
+        return k;
+    }
+
+    private void openSettings() {
+        finishComposing();
+        Intent i = new Intent(this, MainActivity.class);
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        startActivity(i);
+        requestHideSelf(0);
+    }
 
     @Override
     public View onCreateInputView() {
@@ -137,6 +237,7 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
         boolean textClass = cls == InputType.TYPE_CLASS_TEXT;
         symbols = false;
         padOff = false;
+        clipMode = false;
         pad = cls == InputType.TYPE_CLASS_PHONE ? 2
                 : (cls == InputType.TYPE_CLASS_NUMBER || cls == InputType.TYPE_CLASS_DATETIME) ? 1 : 0;
         suggestOn = Prefs.suggestions(this) && textClass && !password && !noSuggest;
@@ -230,7 +331,7 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     }
 
     private boolean t9Layout() {
-        return lang.t9 && !symbols && !inPad();
+        return lang.t9 && !symbols && !inPad() && !clipMode;
     }
 
     private boolean predictive() {
@@ -287,7 +388,8 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
                 break;
             case Key.TO_LETTERS:
                 symbols = false;
-                padOff = true;
+                if (!clipMode) padOff = true;
+                clipMode = false;
                 applyLayer();
                 updateAutoCaps();
                 refreshSuggestions();
@@ -311,6 +413,27 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
                 break;
             case Key.SUGGESTION:
                 pickSuggestion(key.index);
+                break;
+            case Key.TOOL_CLIP:
+                finishComposing();
+                clipMode = true;
+                applyLayer();
+                break;
+            case Key.TOOL_SETTINGS:
+                openSettings();
+                break;
+            case Key.CLIP:
+                if (key.index >= 0 && key.index < clips.size()) {
+                    commit(clips.get(key.index));
+                    clipMode = false;
+                    applyLayer();
+                    updateAutoCaps();
+                    refreshSuggestions();
+                }
+                break;
+            case Key.CLIP_CLEAR:
+                clips.clear();
+                applyLayer();
                 break;
             default:
                 // DELETE bosilgan zahoti bajariladi (onKeyDown).
@@ -401,8 +524,8 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
 
     private void refreshSuggestions() {
         if (view == null) return;
-        view.setStripVisible(suggestOn);
-        if (!suggestOn || symbols || !dict.isReady()) {
+        view.setStripVisible(true);
+        if (!suggestOn || symbols || clipMode || !dict.isReady()) {
             setShown(new ArrayList<>(), "");
             return;
         }
@@ -590,7 +713,9 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
 
     private void applyLayer() {
         if (view == null || lang == null) return;
-        if (inPad()) {
+        if (clipMode) {
+            view.setRows(clipRows(), true, lang);
+        } else if (inPad()) {
             view.setRows(pad == 2 ? lang.phonePad : lang.numberPad, true, lang);
         } else {
             view.setRows(symbols ? lang.symbols : lang.letters, symbols, lang);

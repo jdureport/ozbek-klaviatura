@@ -26,6 +26,7 @@ Har bir özgarişdan keyin GitHub Actions APK'ni avtomatik yiğadi. Tayyor fayln
 - Raqam, telefon va SMS-kod maydonlari uçun katta raqamli klaviatura
 - Ranglarni tanlaş: tayyor mavzular va maxsus ranglar
 - Harf joylarini özgartiriş (har bir til uçun)
+- Bufer paneli (📋) va sozlamalar tugmasi (⚙)
 
 ## Luğatlar
 

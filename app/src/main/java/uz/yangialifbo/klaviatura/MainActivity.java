@@ -175,6 +175,7 @@ public class MainActivity extends Activity {
                         + "• Yuqori qatordagi harfni bosib tursangiz — raqam yoziladi.\n"
                         + "• Böş joyni ikki marta bossangiz — nuqta qöyiladi.\n"
                         + "• Raqam, telefon va SMS-kod maydonlarida katta raqamli klaviatura özi oçiladi.\n"
+                        + "• Takliflar qatoridagi 📋 — oxirgi nusxalangan matnlar, ⚙ — şu sozlamalar.\n"
                         + "• 🌐 yoki böş joyni bosib tursangiz — boşqa klaviaturaga ötasiz.\n"
                         + "• T9: har harf uçun tugmani bir marta bosing, söz özi topiladi. "
                         + "Luğatda yöq sözni yoziş uçun pastki öng tugma bilan «abc» rejimiga öting.\n"
@@ -184,6 +185,16 @@ public class MainActivity extends Activity {
         tips.setPadding(0, px(24), 0, 0);
         tips.setLineSpacing(px(4), 1f);
         col.addView(tips);
+
+        String version = "";
+        try {
+            version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception ignored) {
+            // versiya topilmasa — böş
+        }
+        TextView about = text("Dasturçi: J.Imomnazarov\nVersiya: " + version, 14, textColor);
+        about.setPadding(0, px(24), 0, 0);
+        col.addView(about);
 
         TextView credits = text(
                 "Luğatlar: özbekça — kaharjan/uzb-frequent-words (GPL-3.0); "

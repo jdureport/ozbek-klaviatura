@@ -16,7 +16,9 @@ import android.util.SparseArray;
 import android.util.TypedValue;
 import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
+import android.os.Build;
 import android.view.View;
+import android.view.WindowInsets;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,6 +60,12 @@ public class KlaviaturaView extends View {
     private final Key[] suggestionKeys = new Key[3];
     private List<String> suggestions = new ArrayList<>();
     private boolean stripVisible = true;
+    private final Key[] toolKeys = {
+            new Key(Key.TOOL_CLIP, "", null, 1f), new Key(Key.TOOL_SETTINGS, "", null, 1f)};
+    private final Path clipPath = new Path();
+    private final Path gearPath = new Path();
+    /** Tizim navigatsiya paneli balandligi (Android 15+ da klaviatura uning ostigaça çizadi). */
+    private int navInset;
     private Lang lang;
     private String modeLabel = "T9";
     private final Path globePath = new Path();
@@ -167,6 +175,21 @@ public class KlaviaturaView extends View {
         globePath.moveTo(3, 12);
         globePath.lineTo(21, 12);
 
+        clipPath.addRoundRect(new RectF(5, 4.5f, 19, 21.5f), 2, 2, Path.Direction.CW);
+        clipPath.addRoundRect(new RectF(9, 2.5f, 15, 6.5f), 1.2f, 1.2f, Path.Direction.CW);
+        clipPath.moveTo(8.5f, 11);
+        clipPath.lineTo(15.5f, 11);
+        clipPath.moveTo(8.5f, 15);
+        clipPath.lineTo(13.5f, 15);
+
+        gearPath.addCircle(12, 12, 6.5f, Path.Direction.CW);
+        gearPath.addCircle(12, 12, 2.5f, Path.Direction.CW);
+        for (int i = 0; i < 8; i++) {
+            double a = Math.PI / 4 * i;
+            gearPath.moveTo((float) (12 + 6.5 * Math.cos(a)), (float) (12 + 6.5 * Math.sin(a)));
+            gearPath.lineTo((float) (12 + 9.5 * Math.cos(a)), (float) (12 + 9.5 * Math.sin(a)));
+        }
+
         setHapticFeedbackEnabled(true);
     }
 
@@ -246,8 +269,28 @@ public class KlaviaturaView extends View {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int w = MeasureSpec.getSize(widthMeasureSpec);
-        int h = (int) Math.ceil(keysTop() + bottomPad + rowHeight * Math.max(1, rows.size()));
+        int h = (int) Math.ceil(keysTop() + bottomPad + rowHeight * Math.max(1, rows.size())) + navInset;
         setMeasuredDimension(w, h);
+    }
+
+    @Override
+    public WindowInsets onApplyWindowInsets(WindowInsets insets) {
+        // Android 15 (API 35) dan boşlab klaviatura oynasi navigatsiya paneli ostigaça çiziladi.
+        int bottom = 0;
+        if (Build.VERSION.SDK_INT >= 35) {
+            bottom = insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
+        }
+        if (bottom != navInset) {
+            navInset = bottom;
+            requestLayout();
+        }
+        return insets;
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        requestApplyInsets();
     }
 
     @Override
@@ -261,6 +304,10 @@ public class KlaviaturaView extends View {
         float slot = width / (float) suggestionKeys.length;
         for (int i = 0; i < suggestionKeys.length; i++) {
             suggestionKeys[i].rect.set(i * slot, 0, (i + 1) * slot, stripVisible ? stripHeight : 0);
+        }
+        float tool = stripHeight * 1.25f;
+        for (int i = 0; i < toolKeys.length; i++) {
+            toolKeys[i].rect.set(sidePad + i * tool, 0, sidePad + (i + 1) * tool, stripHeight);
         }
         float maxUnits = 0;
         for (List<Key> row : rows) maxUnits = Math.max(maxUnits, units(row));
@@ -287,6 +334,10 @@ public class KlaviaturaView extends View {
         if (stripVisible && y < stripHeight) {
             int si = (int) (x / (getWidth() / (float) suggestionKeys.length));
             si = Math.max(0, Math.min(suggestionKeys.length - 1, si));
+            if (suggestions.isEmpty()) {
+                for (Key t : toolKeys) if (x >= t.rect.left && x < t.rect.right) return t;
+                return null;
+            }
             return si < suggestions.size() ? suggestionKeys[si] : null;
         }
         int ri = (int) Math.floor((y - keysTop()) / rowHeight);
@@ -317,6 +368,23 @@ public class KlaviaturaView extends View {
 
     private void drawStrip(Canvas canvas) {
         stripPaint.setColor(c.hint);
+        if (suggestions.isEmpty()) {
+            // Asboblar: 📋 bufer, ⚙ sozlamalar
+            Path[] icons = {clipPath, gearPath};
+            for (int i = 0; i < toolKeys.length; i++) {
+                Key t = toolKeys[i];
+                if (isPressed(t)) {
+                    keyPaint.setColor(c.pressed);
+                    canvas.drawRoundRect(t.rect.left + 4, t.rect.top + 4, t.rect.right - 4,
+                            t.rect.bottom - 4, radius, radius, keyPaint);
+                }
+                drawRect.set(t.rect);
+                iconPaint.setStyle(Paint.Style.STROKE);
+                iconPaint.setColor(c.hint);
+                drawIcon(canvas, icons[i]);
+            }
+            return;
+        }
         for (int i = 0; i < suggestionKeys.length; i++) {
             Key k = suggestionKeys[i];
             if (i > 0 && i < suggestions.size()) {
@@ -355,7 +423,8 @@ public class KlaviaturaView extends View {
                 k.rect.right - gapH / 2f, k.rect.bottom - gapV / 2f);
 
         boolean accent = k.type == Key.ENTER || (k.type == Key.SHIFT && shiftState == SHIFT_LOCK);
-        boolean special = k.type != Key.CHAR && k.type != Key.SPACE && k.type != Key.T9;
+        boolean special = k.type != Key.CHAR && k.type != Key.SPACE && k.type != Key.T9
+                && k.type != Key.CLIP;
         int bg;
         if (accent) bg = pressed ? c.accentPressed : c.accent;
         else if (special) bg = pressed ? c.specialPressed : c.specialKey;
@@ -421,6 +490,22 @@ public class KlaviaturaView extends View {
             case Key.T9MODE:
                 drawText(canvas, modeLabel, specialSize, fg);
                 break;
+            case Key.CLIP: {
+                textPaint.setTextSize(spaceSize + 1);
+                textPaint.setColor(k.index < 0 ? c.hint : fg);
+                textPaint.setTextAlign(Paint.Align.LEFT);
+                float max = drawRect.width() - hintInset * 4;
+                String s = k.text.replace('\n', ' ');
+                if (textPaint.measureText(s) > max) {
+                    int n = textPaint.breakText(s, true, max - textPaint.measureText("…"), null);
+                    s = s.substring(0, Math.max(0, n)) + "…";
+                }
+                Paint.FontMetrics fm = textPaint.getFontMetrics();
+                canvas.drawText(s, drawRect.left + hintInset * 2,
+                        drawRect.centerY() - (fm.ascent + fm.descent) / 2f, textPaint);
+                textPaint.setTextAlign(Paint.Align.CENTER);
+                break;
+            }
             case Key.T9: {
                 float cx = drawRect.centerX();
                 textPaint.setTextSize(t9DigitSize);

@@ -23,6 +23,12 @@ public final class Key {
     public static final int TAB = 11;
     public static final int LEFT = 12;
     public static final int RIGHT = 13;
+    /** Bufer paneli: nusxalangan matn, buferni tozalaş. */
+    public static final int CLIP = 14;
+    public static final int CLIP_CLEAR = 15;
+    /** Takliflar qatoridagi asboblar: bufer va sozlamalar. */
+    public static final int TOOL_CLIP = 16;
+    public static final int TOOL_SETTINGS = 17;
 
     public final int type;
     /** Tugmada körinadigan va yoziladigan matn. */
