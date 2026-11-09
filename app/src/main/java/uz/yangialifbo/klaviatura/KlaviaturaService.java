@@ -253,7 +253,10 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
         if (v != builtVersion) {
             builtVersion = v;
             langs.clear();
-            if (view != null) view.applyTheme(Theme.load(this));
+            if (view != null) {
+                view.applyTheme(Theme.load(this));
+                view.loadSizes();
+            }
         }
 
         String current = Prefs.currentLang(this);

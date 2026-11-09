@@ -32,6 +32,7 @@ public class MainActivity extends Activity {
     private KlaviaturaView preview;
     private final View[] colorChips = new View[4];
     private LinearLayout presetRow;
+    private LinearLayout heightRow, bottomRow;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -162,6 +163,43 @@ public class MainActivity extends Activity {
         }
         refreshTheme();
 
+        // ---- Ölçam ----
+        col.addView(step("Ölçam", textColor));
+        col.addView(text("Klaviatura balandligi", 14, mutedColor));
+        heightRow = new LinearLayout(this);
+        for (int i = 0; i < Prefs.HEIGHT_IDS.length; i++) {
+            final String id = Prefs.HEIGHT_IDS[i];
+            Button b = button(Prefs.HEIGHT_NAMES[i], v -> {
+                Prefs.setHeight(this, id);
+                refreshSizes();
+            });
+            b.setTag(id);
+            heightRow.addView(b, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        col.addView(heightRow);
+        TextView bottomHint = text("Pastdan qöşimça joy — telefonning ∨ va 🌐 tugmalari "
+                + "klaviaturaga tegib tursa, kattaroq qiymat tanlang", 14, mutedColor);
+        bottomHint.setPadding(0, px(12), 0, 0);
+        col.addView(bottomHint);
+        bottomRow = new LinearLayout(this);
+        for (int dp : Prefs.EXTRA_BOTTOM) {
+            Button b = button(dp == 0 ? "Yöq" : dp + " dp", v -> {
+                Prefs.setExtraBottom(this, dp);
+                refreshSizes();
+            });
+            b.setTag(dp);
+            bottomRow.addView(b, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        col.addView(bottomRow);
+        CheckBox pv = new CheckBox(this);
+        pv.setText("Bosilgan harfni kattalaştirib körsatiş");
+        pv.setTextColor(textColor);
+        pv.setTextSize(16);
+        pv.setChecked(Prefs.keyPreview(this));
+        pv.setOnCheckedChangeListener((b, on) -> Prefs.setKeyPreview(this, on));
+        col.addView(pv);
+        refreshSizes();
+
         // ---- Harf joylari ----
         col.addView(step("Harf joylari", textColor));
         col.addView(text("Har bir til uçun harflarning joyini özingizga qulay qilib almaştiring.",
@@ -246,6 +284,20 @@ public class MainActivity extends Activity {
         if (preview != null) {
             Lang uz = Lang.create(this, Lang.UZ);
             preview.setRows(uz.letters, false, uz);
+        }
+    }
+
+    private void refreshSizes() {
+        preview.loadSizes();
+        String h = Prefs.height(this);
+        for (int i = 0; i < heightRow.getChildCount(); i++) {
+            View b = heightRow.getChildAt(i);
+            b.setAlpha(h.equals(b.getTag()) ? 1f : 0.5f);
+        }
+        int extra = Prefs.extraBottom(this);
+        for (int i = 0; i < bottomRow.getChildCount(); i++) {
+            View b = bottomRow.getChildAt(i);
+            b.setAlpha(Integer.valueOf(extra).equals(b.getTag()) ? 1f : 0.5f);
         }
     }
 

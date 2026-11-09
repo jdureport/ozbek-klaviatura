@@ -92,4 +92,45 @@ final class Prefs {
         get(c).edit().remove("joylasuv_" + langId).apply();
         bumpVersion(c);
     }
+
+    // ---- Ölçamlar ----
+
+    static final String[] HEIGHT_IDS = {"ixcham", "oddiy", "baland"};
+    static final String[] HEIGHT_NAMES = {"Ixçam", "Oddiy", "Baland"};
+    private static final float[] HEIGHT_SCALES = {0.86f, 1f, 1.14f};
+    static final int[] EXTRA_BOTTOM = {0, 8, 16, 24};
+
+    static String height(Context c) {
+        return get(c).getString("balandlik", "oddiy");
+    }
+
+    static float heightScale(Context c) {
+        String h = height(c);
+        for (int i = 0; i < HEIGHT_IDS.length; i++) if (HEIGHT_IDS[i].equals(h)) return HEIGHT_SCALES[i];
+        return 1f;
+    }
+
+    static void setHeight(Context c, String id) {
+        get(c).edit().putString("balandlik", id).apply();
+        bumpVersion(c);
+    }
+
+    /** Pastdan qöşimça böşliq (dp) — tizim tugmalari ustma-ust tuşsa. */
+    static int extraBottom(Context c) {
+        return get(c).getInt("pastki_bosliq", 0);
+    }
+
+    static void setExtraBottom(Context c, int dp) {
+        get(c).edit().putInt("pastki_bosliq", dp).apply();
+        bumpVersion(c);
+    }
+
+    static boolean keyPreview(Context c) {
+        return get(c).getBoolean("harf_korinishi", true);
+    }
+
+    static void setKeyPreview(Context c, boolean on) {
+        get(c).edit().putBoolean("harf_korinishi", on).apply();
+        bumpVersion(c);
+    }
 }

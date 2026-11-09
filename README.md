@@ -27,6 +27,7 @@ Har bir özgarişdan keyin GitHub Actions APK'ni avtomatik yiğadi. Tayyor fayln
 - Ranglarni tanlaş: tayyor mavzular va maxsus ranglar
 - Harf joylarini özgartiriş (har bir til uçun)
 - Bufer paneli (📋) va sozlamalar tugmasi (⚙)
+- Balandlik (Ixçam / Oddiy / Baland), pastki böşliq, bosilgan harfni kattalaştirib körsatiş
 
 ## Luğatlar
 

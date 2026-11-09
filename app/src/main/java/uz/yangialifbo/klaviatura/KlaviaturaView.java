@@ -66,6 +66,9 @@ public class KlaviaturaView extends View {
     private final Path gearPath = new Path();
     /** Tizim navigatsiya paneli balandligi (Android 15+ da klaviatura uning ostigaça çizadi). */
     private int navInset;
+    private boolean previewOn = true;
+    private float previewSize;
+    private final RectF bubble = new RectF();
     private Lang lang;
     private String modeLabel = "T9";
     private final Path globePath = new Path();
@@ -76,7 +79,7 @@ public class KlaviaturaView extends View {
     private String enterLabel;
     private String spaceLabel = "Özbek";
 
-    private final float rowHeight, sidePad, topPad, bottomPad, gapH, gapV, radius, shadowDy,
+    private float rowHeight, sidePad, topPad, bottomPad, gapH, gapV, radius, shadowDy,
             letterSize, specialSize, spaceSize, hintSize, iconSize, hintInset, stripHeight,
             suggestionSize, t9DigitSize, t9LettersSize;
 
@@ -102,27 +105,7 @@ public class KlaviaturaView extends View {
     public KlaviaturaView(Context context) {
         super(context);
         DisplayMetrics dm = getResources().getDisplayMetrics();
-        boolean landscape = getResources().getConfiguration().orientation
-                == Configuration.ORIENTATION_LANDSCAPE;
-
-        rowHeight = dp(dm, landscape ? 44 : 56);
-        sidePad = dp(dm, 3);
-        topPad = dp(dm, 6);
-        bottomPad = dp(dm, 6);
-        gapH = dp(dm, 5);
-        gapV = dp(dm, 8);
-        radius = dp(dm, 7);
-        shadowDy = dp(dm, 1.2f);
-        letterSize = sp(dm, 23);
-        specialSize = sp(dm, 15);
-        spaceSize = sp(dm, 13);
-        hintSize = sp(dm, 10.5f);
-        iconSize = dp(dm, 22);
-        hintInset = dp(dm, 5);
-        stripHeight = dp(dm, 42);
-        suggestionSize = sp(dm, 16);
-        t9DigitSize = sp(dm, 22);
-        t9LettersSize = sp(dm, 13);
+        loadSizes();
         for (int i = 0; i < suggestionKeys.length; i++) {
             suggestionKeys[i] = new Key(Key.SUGGESTION, "", null, 1f);
             suggestionKeys[i].index = i;
@@ -191,6 +174,37 @@ public class KlaviaturaView extends View {
         }
 
         setHapticFeedbackEnabled(true);
+    }
+
+    /** Ölçamlarni sozlamalardan yuklaş (balandlik, pastki böşliq). */
+    public void loadSizes() {
+        DisplayMetrics dm = getResources().getDisplayMetrics();
+        boolean landscape = getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
+        float scale = Prefs.heightScale(getContext());
+        rowHeight = dp(dm, (landscape ? 44 : 54) * scale);
+        sidePad = dp(dm, 4);
+        topPad = dp(dm, 4);
+        bottomPad = dp(dm, 6 + Prefs.extraBottom(getContext()));
+        gapH = dp(dm, 6);
+        gapV = dp(dm, 10 * Math.min(1.1f, scale));
+        radius = dp(dm, 8);
+        shadowDy = dp(dm, 1f);
+        letterSize = sp(dm, 22);
+        specialSize = sp(dm, 15);
+        spaceSize = sp(dm, 13);
+        hintSize = sp(dm, 10);
+        iconSize = dp(dm, 22);
+        hintInset = dp(dm, 5);
+        stripHeight = dp(dm, 44);
+        suggestionSize = sp(dm, 16);
+        t9DigitSize = sp(dm, 22);
+        t9LettersSize = sp(dm, 13);
+        previewOn = Prefs.keyPreview(getContext());
+        previewSize = sp(dm, 30);
+        if (getWidth() > 0) layoutKeys(getWidth());
+        requestLayout();
+        invalidate();
     }
 
     private static float dp(DisplayMetrics dm, float v) {
@@ -278,7 +292,10 @@ public class KlaviaturaView extends View {
         // Android 15 (API 35) dan boşlab klaviatura oynasi navigatsiya paneli ostigaça çiziladi.
         int bottom = 0;
         if (Build.VERSION.SDK_INT >= 35) {
-            bottom = insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
+            // navigationBars — tizim paneli; tappableElement — klaviatura oçiqligida
+            // çiqadigan ∨ (yopiş) va 🌐 (klaviaturani almaştiriş) tugmalari.
+            bottom = Math.max(insets.getInsets(WindowInsets.Type.navigationBars()).bottom,
+                    insets.getInsets(WindowInsets.Type.tappableElement()).bottom);
         }
         if (bottom != navInset) {
             navInset = bottom;
@@ -364,6 +381,38 @@ public class KlaviaturaView extends View {
         for (List<Key> row : rows) {
             for (Key k : row) drawKey(canvas, k, isPressed(k));
         }
+        if (previewOn) drawPreview(canvas);
+    }
+
+    /** Bosilgan harfni tugma ustida kattalaştirib körsatiş (Gboard kabi). */
+    private void drawPreview(Canvas canvas) {
+        Press p = null;
+        for (int i = 0; i < presses.size(); i++) {
+            Press q = presses.valueAt(i);
+            if (!q.consumed && q.key.type == Key.CHAR) p = q;
+        }
+        if (p == null) return;
+        Key k = p.key;
+        float kw = k.rect.width() - gapH;
+        float w = Math.max(kw * 1.3f, previewSize * 1.6f);
+        float h = (k.rect.height() - gapV) * 1.45f;
+        float cx = k.rect.centerX();
+        float left = Math.max(0, Math.min(getWidth() - w, cx - w / 2f));
+        float bottom = k.rect.top + gapV / 2f + (k.rect.height() - gapV) * 0.35f;
+        float top = Math.max(0, bottom - h);
+        bubble.set(left, top, left + w, bottom);
+        keyPaint.setColor(c.shadow);
+        canvas.drawRoundRect(bubble.left, bubble.top + shadowDy * 2, bubble.right,
+                bubble.bottom + shadowDy * 2, radius * 1.5f, radius * 1.5f, keyPaint);
+        keyPaint.setColor(c.key);
+        canvas.drawRoundRect(bubble, radius * 1.5f, radius * 1.5f, keyPaint);
+        String label = (!symbols && shiftState != SHIFT_OFF) ? upper(k.text) : k.text;
+        textPaint.setTextSize(previewSize);
+        textPaint.setColor(c.text);
+        Paint.FontMetrics fm = textPaint.getFontMetrics();
+        canvas.drawText(label, bubble.centerX(),
+                bubble.top + (bubble.height() * 0.62f) - (fm.ascent + fm.descent) / 2f - bubble.height() * 0.12f,
+                textPaint);
     }
 
     private void drawStrip(Canvas canvas) {
