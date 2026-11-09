@@ -580,7 +580,40 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     private void learnWordBeforeCursor() {
         if (!learnOn || symbols || t9Layout()) return;
         String w = wordBeforeCursor();
-        if (w.length() >= 2) dict.learn(lang.lower(w));
+        if (w.isEmpty()) return;
+        String lw = lang.lower(w);
+        if (w.length() >= 2) dict.learn(lw);
+        String prev = prevWord(w.length());
+        if (!prev.isEmpty()) dict.learnPair(prev, lw);
+    }
+
+    /**
+     * Kursordan oldingi matnda (oxirgi {@code skip} belgini taşlab) "söz + böş joy" bilan
+     * tugaydigan sözni qaytaradi (kiçik harfda); bölmasa — böş satr.
+     */
+    private String prevWord(int skip) {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return "";
+        CharSequence before = ic.getTextBeforeCursor(64 + skip, 0);
+        if (before == null || before.length() <= skip) return "";
+        CharSequence s = before.subSequence(0, before.length() - skip);
+        int end = s.length();
+        if (end < 2 || s.charAt(end - 1) != ' ' || !lang.isWordChar(s.charAt(end - 2))) return "";
+        int i = end - 1;
+        while (i > 0 && lang.isWordChar(s.charAt(i - 1))) i--;
+        String w = s.subSequence(i, end - 1).toString();
+        while (!w.isEmpty() && !Character.isLetter(w.charAt(0))) w = w.substring(1);
+        return lang.lower(w);
+    }
+
+    /** Keyingi söz takliflari (söz va böş joydan keyin). */
+    private void showPredictions() {
+        String prev = prevWord(0);
+        if (prev.isEmpty()) {
+            setShown(new ArrayList<>(), "");
+            return;
+        }
+        setShown(dict.next(prev, SHOWN), "");
     }
 
     private void refreshSuggestions() {
@@ -591,12 +624,12 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
             return;
         }
         if (t9Layout()) {
-            if (!isComposing()) setShown(new ArrayList<>(), "");
+            if (!isComposing()) showPredictions();
             return;
         }
         String typed = wordBeforeCursor();
         if (typed.isEmpty()) {
-            setShown(new ArrayList<>(), "");
+            showPredictions();
             return;
         }
         setShown(dict.complete(lang.lower(typed), SHOWN), typed);
@@ -616,18 +649,26 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
         if (ic == null) return;
         if (t9Layout() && isComposing()) {
             String w = applyCase(raw);
+            String prev = prevWord(mtWord.length() > 0 ? mtWord.length() : t9Raw.length());
             ic.commitText(w + " ", 1);
-            if (learnOn) dict.learn(raw);
+            if (learnOn) {
+                dict.learn(raw);
+                if (!prev.isEmpty()) dict.learnPair(prev, raw);
+            }
             resetComposingState();
             refreshSuggestions();
             return;
         }
         String typed = wordBeforeCursor();
+        String prev = prevWord(typed.length());
         ic.beginBatchEdit();
         if (!typed.isEmpty()) ic.deleteSurroundingText(typed.length(), 0);
         ic.commitText(lang.matchCase(typed, raw) + " ", 1);
         ic.endBatchEdit();
-        if (learnOn) dict.learn(raw);
+        if (learnOn) {
+            dict.learn(raw);
+            if (!prev.isEmpty()) dict.learnPair(prev, raw);
+        }
         if (shift == KlaviaturaView.SHIFT_ONCE) setShift(KlaviaturaView.SHIFT_OFF);
     }
 
@@ -850,8 +891,10 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
         if (ic == null) return;
         if (t9Layout() && isComposing()) {
             String raw = mtWord.length() > 0 ? mtWord.toString() : t9Raw;
+            String prev = prevWord(raw.length());
             ic.commitText(applyCase(raw) + " ", 1);
             learnComposed(raw);
+            if (learnOn && !prev.isEmpty() && raw.length() >= 1) dict.learnPair(prev, raw);
             resetComposingState();
             lastSpaceTap = SystemClock.uptimeMillis();
             return;

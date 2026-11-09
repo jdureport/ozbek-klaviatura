@@ -160,6 +160,7 @@ public class MainActivity extends Activity {
                 {"123", "Bossangiz — belgilar, bosib tursangiz — raqamli klaviatura"},
                 {"⇧", "Ikki marta bossangiz — doimiy boş harf"},
                 {"ç v", "Bosib tursangiz: ç → c, v → w"},
+                {"→", "Söz va böş joydan keyin — keyingi söz takliflari; klaviatura sizdan örganadi"},
                 {"📋", "Takliflar qatorida — oxirgi nusxalangan matnlar"},
                 {"␣␣", "Böş joyni ikki marta bossangiz — nuqta qöyiladi"},
         };

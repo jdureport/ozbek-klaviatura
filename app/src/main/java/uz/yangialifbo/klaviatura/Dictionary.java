@@ -33,6 +33,9 @@ final class Dictionary {
     private String[] t9Seq = new String[0];   // T9 raqamlar ketma-ketligi, saralangan
     private int[] t9Word = new int[0];        // t9Seq[i] → words dagi indeks
     private final Map<String, Integer> user = new HashMap<>();
+    /** Keyingi söz: boşlanğiç baza (assets/dict/<til>_next.txt) va foydalanuvçidan örganilgan juftliklar. */
+    private final Map<String, String[]> seedNext = new HashMap<>();
+    private final Map<String, Map<String, Integer>> userNext = new HashMap<>();
     private int boost = 1000;
     private volatile boolean ready;
     private boolean dirty;
@@ -91,6 +94,18 @@ final class Dictionary {
             }
         }
         Map<String, Integer> learned = readUserFile(context);
+        Map<String, String[]> seeds = new HashMap<>();
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(
+                context.getAssets().open("dict/" + name + "_next.txt"), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = r.readLine()) != null) {
+                int tab = line.indexOf('\t');
+                if (tab > 0) seeds.put(line.substring(0, tab), line.substring(tab + 1).trim().split(" "));
+            }
+        } catch (IOException ignored) {
+            // bu til uçun boşlanğiç baza yöq
+        }
+        Map<String, Map<String, Integer>> learnedNext = readPairsFile(context);
         synchronized (this) {
             words = w;
             scores = s;
@@ -98,6 +113,10 @@ final class Dictionary {
             t9Word = seqWord;
             boost = Math.max(1000, n / 8);
             user.putAll(learned);
+            seedNext.putAll(seeds);
+            for (Map.Entry<String, Map<String, Integer>> e : learnedNext.entrySet()) {
+                userNext.put(e.getKey(), e.getValue());
+            }
         }
         ready = true;
     }
@@ -164,6 +183,45 @@ final class Dictionary {
         return out;
     }
 
+    /** Oldingi sözdan keyin kelişi mumkin bölgan sözlar. */
+    synchronized List<String> next(String prev, int max) {
+        List<String> out = new ArrayList<>();
+        List<Integer> outScore = new ArrayList<>();
+        Map<String, Integer> u = userNext.get(prev);
+        if (u != null) {
+            for (Map.Entry<String, Integer> e : u.entrySet()) {
+                insert(out, outScore, e.getKey(), 1000 + e.getValue() * 100, max);
+            }
+        }
+        String[] s = seedNext.get(prev);
+        if (s != null) {
+            for (int i = 0; i < s.length; i++) insert(out, outScore, s[i], 500 - i, max);
+        }
+        return out;
+    }
+
+    /** "prev word" juftligini eslab qoliş. */
+    synchronized void learnPair(String prev, String w) {
+        if (prev.isEmpty() || w.length() < 1 || prev.length() > 40 || w.length() > 40) return;
+        Map<String, Integer> m = userNext.get(prev);
+        if (m == null) {
+            if (userNext.size() > 20000) return;
+            m = new HashMap<>();
+            userNext.put(prev, m);
+        }
+        Integer c = m.get(w);
+        m.put(w, c == null ? 1 : Math.min(c + 1, 50));
+        if (m.size() > 12) {
+            // eng kam işlatilganini olib taşlaymiz
+            String min = null;
+            for (Map.Entry<String, Integer> e : m.entrySet()) {
+                if (!e.getKey().equals(w) && (min == null || e.getValue() < m.get(min))) min = e.getKey();
+            }
+            if (min != null) m.remove(min);
+        }
+        dirty = true;
+    }
+
     synchronized boolean contains(String w) {
         return Arrays.binarySearch(words, w) >= 0 || user.containsKey(w);
     }
@@ -178,19 +236,38 @@ final class Dictionary {
 
     synchronized void clearLearned(Context context) {
         user.clear();
+        userNext.clear();
         dirty = false;
         //noinspection ResultOfMethodCallIgnored
         userFile(context).delete();
+        //noinspection ResultOfMethodCallIgnored
+        pairsFile(context).delete();
     }
 
     /** Fon oqimida çaqiriladi. */
     void save(Context context) {
         Map<String, Integer> copy;
+        StringBuilder pairs = new StringBuilder();
         synchronized (this) {
             if (!dirty) return;
             copy = new HashMap<>(user);
+            for (Map.Entry<String, Map<String, Integer>> e : userNext.entrySet()) {
+                for (Map.Entry<String, Integer> n : e.getValue().entrySet()) {
+                    pairs.append(e.getKey()).append('\t').append(n.getKey()).append('\t')
+                            .append(n.getValue()).append('\n');
+                }
+            }
             dirty = false;
         }
+        File pf = pairsFile(context);
+        File ptmp = new File(pf.getPath() + ".tmp");
+        try (Writer out = new OutputStreamWriter(new FileOutputStream(ptmp), StandardCharsets.UTF_8)) {
+            out.write(pairs.toString());
+        } catch (IOException ignored) {
+            // juftliklarni saqlab bölmasa — keyingi safar
+        }
+        //noinspection ResultOfMethodCallIgnored
+        ptmp.renameTo(pf);
         File f = userFile(context);
         File tmp = new File(f.getPath() + ".tmp");
         try (Writer out = new OutputStreamWriter(new FileOutputStream(tmp), StandardCharsets.UTF_8)) {
@@ -227,6 +304,37 @@ final class Dictionary {
             // fayl öqilmasa — böş
         }
         return m;
+    }
+
+    private Map<String, Map<String, Integer>> readPairsFile(Context context) {
+        Map<String, Map<String, Integer>> m = new HashMap<>();
+        File f = pairsFile(context);
+        if (!f.exists()) return m;
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(
+                new FileInputStream(f), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = r.readLine()) != null) {
+                String[] p = line.split("\t");
+                if (p.length != 3) continue;
+                try {
+                    Map<String, Integer> inner = m.get(p[0]);
+                    if (inner == null) {
+                        inner = new HashMap<>();
+                        m.put(p[0], inner);
+                    }
+                    inner.put(p[1], Integer.parseInt(p[2].trim()));
+                } catch (NumberFormatException ignored) {
+                    // buzilgan qator
+                }
+            }
+        } catch (IOException ignored) {
+            // fayl öqilmasa — böş
+        }
+        return m;
+    }
+
+    private File pairsFile(Context context) {
+        return new File(context.getFilesDir(), "juft_" + name + ".txt");
     }
 
     private File userFile(Context context) {

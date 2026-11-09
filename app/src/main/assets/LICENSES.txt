@@ -10,6 +10,9 @@ LUĞATLAR VA ULARNING LITSENZIYALARI
    https://github.com/MaksudSharipov/UzbekLemmaStems-POS-Dataset — Apache License 2.0
    (https://www.apache.org/licenses/LICENSE-2.0). Maʼlumotlar söz röyxatiga aylantirilgan va alifbosi özgartirilgan.
 
+Keyingi söz bazasi (assets/dict/*_next.txt): qöl bilan tuzilgan juftliklar — Özbek klaviatura loyihasi;
+   özbekça qismiga yuqoridagi CC0 korpusdan olingan juftliklar qöşilgan.
+
 Qoraqalpoqça luğat (assets/dict/kaa.txt) — "Sozlik", Shag'ala Lab
    https://github.com/shagalalab/sozlik-android — MIT litsenziyasi (matni quyida).
    Sarlavha sözlari ajratib olingan va 2016-yilgi lotin alifbosiga öğirilgan.
