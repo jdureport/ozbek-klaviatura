@@ -12,7 +12,7 @@ final class Layouts {
     // ---- Harf qatorlari (foydalanuvçi joylarini özgartira oladi) ----
 
     /** Özbekça (2026-yilgi lotin alifbosi): 28 harf + ʼ. */
-    static final String[] UZ_ROWS = {"qşertyuioöp", "asdfgğhjkl", "zxçvbnmʼ"};
+    static final String[] UZ_ROWS = {"qertyuioöp", "asşdfgğhjkl", "zxçvbnmʼ"};
     /** Qoraqalpoqça (2016-yilgi lotin alifbosi): 32 harf; sh, ch — ikki harf bilan. */
     static final String[] KAA_ROWS = {"qwertyuúiıop", "aásdfgǵhjkl", "zxcvbnńmó"};
     static final String[] EN_ROWS = {"qwertyuiop", "asdfghjkl", "zxcvbnm'"};
@@ -53,6 +53,7 @@ final class Layouts {
     }
 
     private static String letterAlt(String langId, char c) {
+        if (Lang.UZ.equals(langId) && c == 'ç') return "c";
         if (Lang.RU.equals(langId)) {
             if (c == 'ь') return "ъ";
             if (c == 'е') return "ё";
@@ -77,6 +78,8 @@ final class Layouts {
             }
             out.add(nr);
         }
+        // 1-harf qatori töliq kenglikni egallaydi — raqamlar qatori bilan ustma-ust tekis.
+        float w0 = total / rows[0].length();
         List<Key> r0 = new ArrayList<>();
         for (int i = 0; i < rows[0].length(); i++) {
             char ch = rows[0].charAt(i);
@@ -85,7 +88,7 @@ final class Layouts {
                 alt = numberRow ? symAt(SYM0, i)
                         : (i < DIGITS.length() ? String.valueOf(DIGITS.charAt(i)) : null);
             }
-            r0.add(Key.ch(String.valueOf(ch), alt, w));
+            r0.add(Key.ch(String.valueOf(ch), alt, w0));
         }
         out.add(r0);
         List<Key> r1 = new ArrayList<>();
@@ -111,7 +114,7 @@ final class Layouts {
         }
         r2.add(Key.special(Key.DELETE, "", side));
         out.add(r2);
-        out.add(bottomRow("?123", total));
+        out.add(bottomRow("123", total));
         return out;
     }
 
@@ -171,7 +174,7 @@ final class Layouts {
      *   1 ʼ.,  2 abç  3 def   ⌫
      *   4 ghiğ 5 jkl  6 mnoö  ⇧
      *   7 pqrsş 8 tuv 9 xyz   ↵
-     *   ?123   🌐    ␣ 0     T9
+     *   123    😊    ␣ 0     T9
      */
     static List<List<Key>> uzT9() {
         List<List<Key>> rows = new ArrayList<>();
@@ -181,7 +184,7 @@ final class Layouts {
                 Key.special(Key.SHIFT, "", 1f)));
         rows.add(row(Key.t9("7", "pqrsş"), Key.t9("8", "tuv"), Key.t9("9", "xyz"),
                 Key.special(Key.ENTER, "", 1f)));
-        rows.add(row(Key.special(Key.TO_SYMBOLS, "?123", 1f), Key.special(Key.LANG, "", 1f),
+        rows.add(row(Key.special(Key.TO_SYMBOLS, "123", 1f), Key.special(Key.EMOJI_KEY, "", 1f),
                 Key.special(Key.SPACE, "0", 1f), Key.special(Key.T9MODE, "T9", 1f)));
         return rows;
     }
@@ -205,11 +208,11 @@ final class Layouts {
         return rows;
     }
 
-    /** Pastki qator: ?123  🌐  ,  [böş joy]  .  ↵ */
+    /** Pastki qator: 123  😊  ,  [◂ til ▸]  .  ↵ */
     private static List<Key> bottomRow(String layerLabel, float total) {
         return row(
                 Key.special(Key.TO_SYMBOLS, layerLabel, 1.25f),
-                Key.special(Key.LANG, "", 1f),
+                Key.special(Key.EMOJI_KEY, "", 1f),
                 Key.ch(",", "-"),
                 Key.special(Key.SPACE, " ", total - 6.25f),
                 Key.ch(".", "?"),

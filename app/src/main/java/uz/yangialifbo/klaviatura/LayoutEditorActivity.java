@@ -29,75 +29,49 @@ public class LayoutEditorActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        density = getResources().getDisplayMetrics().density;
-        boolean night = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
-                == Configuration.UI_MODE_NIGHT_YES;
-        textColor = night ? 0xFFF1F2F4 : 0xFF1A1C20;
-        mutedColor = night ? 0xFF9095A0 : 0xFF5E646E;
-        keyColor = night ? 0xFF33353A : 0xFFFFFFFF;
-        bgColor = night ? 0xFF17181B : 0xFFE6E8EC;
-        accent = night ? 0xFF23A3AE : 0xFF0E7C86;
+        Ui ui = new Ui(this);
+        density = ui.d;
+        textColor = ui.text;
+        mutedColor = ui.muted;
+        keyColor = ui.night ? 0xFF33353A : 0xFFFFFFFF;
+        bgColor = ui.night ? 0xFF24272B : 0xFFE6E8EC;
+        accent = ui.accent;
 
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFitsSystemWindows(true);
-        LinearLayout col = new LinearLayout(this);
-        col.setOrientation(LinearLayout.VERTICAL);
-        col.setPadding(px(20), px(24), px(20), px(24));
-        scroll.addView(col);
-
-        TextView title = new TextView(this);
-        title.setText("Harf joylari");
-        title.setTextSize(24);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(textColor);
-        col.addView(title);
-
-        TextView hint = new TextView(this);
-        hint.setText("Ikki harfni ketma-ket bosing — ularning joyi almaşadi. "
-                + "Özgarişlar darhol saqlanadi va klaviaturada keyingi safar körinadi.");
-        hint.setTextSize(15);
-        hint.setTextColor(mutedColor);
-        hint.setPadding(0, px(6), 0, px(16));
+        LinearLayout col = ui.screen();
+        col.addView(ui.title("Harf joylari", this::finish));
+        TextView hint = ui.text("Ikki harfni ketma-ket bosing — ularning joyi almaşadi. "
+                + "Özgarişlar darhol saqlanadi.", 15, ui.muted, false);
+        hint.setPadding(ui.px(4), 0, ui.px(4), ui.px(14));
         col.addView(hint);
 
+        String[] names = new String[Layouts.EDITABLE.length];
+        for (int i = 0; i < names.length; i++) names[i] = Lang.settingsName(Layouts.EDITABLE[i]);
+        LinearLayout seg = ui.segmented(names, 0, i -> {
+            langId = Layouts.EDITABLE[i];
+            load();
+        });
+        ((LinearLayout.LayoutParams) seg.getLayoutParams()).setMargins(0, 0, 0, ui.px(14));
+        col.addView(seg);
         tabs = new LinearLayout(this);
-        col.addView(tabs);
-        for (String id : Layouts.EDITABLE) {
-            Button b = new Button(this);
-            b.setAllCaps(false);
-            b.setText(Lang.settingsName(id));
-            b.setTag(id);
-            b.setOnClickListener(v -> {
-                langId = id;
-                load();
-            });
-            tabs.addView(b, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        }
 
+        LinearLayout card = ui.card();
+        card.setPadding(ui.px(8), ui.px(12), ui.px(8), ui.px(12));
         grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
-        grid.setPadding(px(6), px(10), px(6), px(10));
+        grid.setPadding(ui.px(4), ui.px(8), ui.px(4), ui.px(8));
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(bgColor);
-        bg.setCornerRadius(px(14));
+        bg.setCornerRadius(ui.px(16));
         grid.setBackground(bg);
-        LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        glp.topMargin = px(14);
-        glp.bottomMargin = px(14);
-        col.addView(grid, glp);
+        card.addView(grid);
+        col.addView(card);
 
-        Button reset = new Button(this);
-        reset.setAllCaps(false);
-        reset.setText("Asl holiga qaytariş");
-        reset.setOnClickListener(v -> {
+        col.addView(ui.tonalButton("Asl holiga qaytariş", v -> {
             Prefs.resetLayout(this, langId);
             Toast.makeText(this, "Asl joylaşuv tiklandi", Toast.LENGTH_SHORT).show();
             load();
-        });
-        col.addView(reset);
+        }), ui.matchWrap(16));
 
-        setContentView(scroll);
         load();
     }
 

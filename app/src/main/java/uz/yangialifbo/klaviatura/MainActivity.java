@@ -1,259 +1,153 @@
 package uz.yangialifbo.klaviatura;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Intent;
-import android.content.res.Configuration;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.Button;
-import android.widget.CheckBox;
-import android.widget.Toast;
 import android.widget.EditText;
-import android.widget.GridLayout;
-import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 
-/** Ilova oçilganda körinadigan ekran: yoqiş, tanlaş va sinab köriş. */
+/** Bosh ekran: klaviaturani yoqiş, tanlaş va sinab köriş. Sozlamalar alohida ekranda. */
 public class MainActivity extends Activity {
 
-    private TextView status;
-    private float density;
-    private boolean night;
-    private int textColor, mutedColor;
-    private KlaviaturaView preview;
-    private final View[] colorChips = new View[4];
-    private LinearLayout presetRow;
-    private LinearLayout heightRow, bottomRow;
+    private Ui ui;
+    private LinearLayout setupCard;
+    private TextView statusTitle, statusText;
+    private View statusDot;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        density = getResources().getDisplayMetrics().density;
-        night = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
-                == Configuration.UI_MODE_NIGHT_YES;
-        textColor = night ? 0xFFF1F2F4 : 0xFF1A1C20;
-        mutedColor = night ? 0xFF9095A0 : 0xFF5E646E;
+        ui = new Ui(this);
+        LinearLayout col = ui.screen();
 
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFitsSystemWindows(true);
-        LinearLayout col = new LinearLayout(this);
-        col.setOrientation(LinearLayout.VERTICAL);
-        int pad = px(24);
-        col.setPadding(pad, pad, pad, pad);
-        scroll.addView(col);
+        // ---- Sarlavha ----
+        LinearLayout hero = new LinearLayout(this);
+        hero.setGravity(Gravity.CENTER_VERTICAL);
+        hero.setPadding(0, ui.px(20), 0, ui.px(22));
+        TextView logo = new TextView(this);
+        logo.setText("ö");
+        logo.setTextSize(30);
+        logo.setTypeface(Typeface.DEFAULT_BOLD);
+        logo.setTextColor(0xFFFFFFFF);
+        logo.setGravity(Gravity.CENTER);
+        GradientDrawable lg = new GradientDrawable();
+        lg.setColor(0xFF0E7C86);
+        lg.setCornerRadius(ui.px(18));
+        logo.setBackground(lg);
+        hero.addView(logo, new LinearLayout.LayoutParams(ui.px(60), ui.px(60)));
+        LinearLayout ht = new LinearLayout(this);
+        ht.setOrientation(LinearLayout.VERTICAL);
+        ht.setPadding(ui.px(16), 0, 0, 0);
+        ht.addView(ui.text("Özbek klaviatura", 26, ui.text, true));
+        ht.addView(ui.text("Yangi alifboda bemalol yozing", 15, ui.muted, false));
+        hero.addView(ht);
+        col.addView(hero);
 
-        TextView title = text("Yangi alifbo klaviaturasi", 26, textColor);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        col.addView(title);
-
-        TextView sub = text("Özbek tilining 2026-yilgi lotin alifbosi: 28 harf va ʼ belgisi.",
-                16, mutedColor);
-        sub.setPadding(0, px(6), 0, px(20));
-        col.addView(sub);
-
-        status = text("", 15, textColor);
-        status.setPadding(px(14), px(12), px(14), px(12));
-        GradientDrawable box = new GradientDrawable();
-        box.setCornerRadius(px(10));
-        box.setColor(night ? 0xFF24262A : 0xFFEEF6F7);
-        status.setBackground(box);
+        // ---- Holat ----
+        LinearLayout status = ui.card();
+        LinearLayout srow = new LinearLayout(this);
+        srow.setGravity(Gravity.CENTER_VERTICAL);
+        srow.setPadding(ui.px(18), ui.px(16), ui.px(18), ui.px(16));
+        statusDot = new View(this);
+        srow.addView(statusDot, new LinearLayout.LayoutParams(ui.px(12), ui.px(12)));
+        LinearLayout stexts = new LinearLayout(this);
+        stexts.setOrientation(LinearLayout.VERTICAL);
+        stexts.setPadding(ui.px(14), 0, 0, 0);
+        statusTitle = ui.text("", 17, ui.text, true);
+        statusText = ui.text("", 14, ui.muted, false);
+        stexts.addView(statusTitle);
+        stexts.addView(statusText);
+        srow.addView(stexts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        status.addView(srow);
         col.addView(status);
 
-        col.addView(step("1. Klaviaturani yoqing", textColor));
-        col.addView(button("Sozlamalarni oçiş", v ->
-                startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))));
-
-        col.addView(step("2. Uni asosiy klaviatura qilib tanlang", textColor));
-        col.addView(button("Klaviaturani tanlaş", v -> {
+        // ---- Yoqiş va tanlaş ----
+        setupCard = ui.card();
+        setupCard.setPadding(ui.px(18), ui.px(16), ui.px(18), ui.px(18));
+        setupCard.addView(ui.text("1. Klaviaturani yoqing", 16, ui.text, true));
+        TextView s1 = ui.text("Android sozlamalarida «Özbek (yangi alifbo)»ni yoqing.", 14, ui.muted, false);
+        s1.setPadding(0, ui.px(2), 0, ui.px(10));
+        setupCard.addView(s1);
+        setupCard.addView(ui.primary("Sozlamalarni oçiş", v ->
+                startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))), ui.matchWrap(0));
+        TextView h2 = ui.text("2. Uni asosiy klaviatura qilib tanlang", 16, ui.text, true);
+        h2.setPadding(0, ui.px(20), 0, 0);
+        setupCard.addView(h2);
+        TextView s2 = ui.text("Röyxatdan «Özbek (yangi alifbo)»ni belgilang.", 14, ui.muted, false);
+        s2.setPadding(0, ui.px(2), 0, ui.px(10));
+        setupCard.addView(s2);
+        setupCard.addView(ui.primary("Klaviaturani tanlaş", v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
             if (imm != null) imm.showInputMethodPicker();
-        }));
+        }), ui.matchWrap(0));
+        col.addView(setupCard, ui.matchWrap(12));
 
-        col.addView(step("3. Şu yerda sinab köring", textColor));
-        EditText test = new EditText(this);
-        test.setHint("Masalan: Ötgan kuni çiroyli ğunça oçildi");
-        test.setMinLines(3);
-        test.setGravity(Gravity.TOP | Gravity.START);
-        col.addView(test, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        // ---- Sinov ----
+        col.addView(ui.section("Sinab köring"));
+        LinearLayout test = ui.card();
+        test.setPadding(ui.px(14), ui.px(14), ui.px(14), ui.px(14));
+        EditText field = new EditText(this);
+        field.setHint("Ötgan kuni çiroyli ğunça oçildi…");
+        field.setHintTextColor(ui.muted);
+        field.setTextColor(ui.text);
+        field.setTextSize(17);
+        field.setMinLines(3);
+        field.setGravity(Gravity.TOP | Gravity.START);
+        field.setPadding(ui.px(14), ui.px(12), ui.px(14), ui.px(12));
+        GradientDrawable fg = new GradientDrawable();
+        fg.setColor(ui.night ? 0xFF24272B : 0xFFF3F5F7);
+        fg.setCornerRadius(ui.px(14));
+        field.setBackground(fg);
+        test.addView(field);
+        col.addView(test);
 
-        col.addView(step("Tillar", textColor));
-        TextView langHint = text("🌐 tugmasi yoqilgan tillar orasida almaştiradi.", 14, mutedColor);
-        col.addView(langHint);
-        for (String id : Lang.ALL) {
-            CheckBox cb = new CheckBox(this);
-            cb.setText(Lang.settingsName(id));
-            cb.setTextColor(textColor);
-            cb.setTextSize(16);
-            cb.setChecked(Prefs.langEnabled(this, id));
-            cb.setOnCheckedChangeListener((b, on) -> {
-                Prefs.setLangEnabled(this, id, on);
-                if (!on && Prefs.enabledLangs(this).size() == 1
-                        && !Prefs.langEnabled(this, Prefs.enabledLangs(this).get(0))) {
-                    Prefs.setLangEnabled(this, Lang.UZ, true);
-                }
-            });
-            col.addView(cb);
+        // ---- Sozlamalar ----
+        col.addView(ui.section("Klaviatura"));
+        LinearLayout nav = ui.card();
+        nav.addView(ui.row("Sozlamalar", "Mavzu, ranglar, ölçam, tillar va takliflar",
+                ui.chevron(), v -> startActivity(new Intent(this, SettingsActivity.class))));
+        nav.addView(ui.divider());
+        nav.addView(ui.row("Harf joylari", "Harflarni özingizga qulay qilib almaştiring",
+                ui.chevron(), v -> startActivity(new Intent(this, LayoutEditorActivity.class))));
+        col.addView(nav);
+
+        // ---- Qisqa yöriqnoma ----
+        col.addView(ui.section("Qisqa yöriqnoma"));
+        LinearLayout tips = ui.card();
+        String[][] items = {
+                {"◂ ▸", "Böş joyni çapga yoki öngga surib tilni almaştiring"},
+                {"😊", "Emoji tugmasi — emojilar; bosib tursangiz, boşqa klaviaturaga ötasiz"},
+                {"123", "Bossangiz — belgilar, bosib tursangiz — raqamli klaviatura"},
+                {"⇧", "Ikki marta bossangiz — doimiy boş harf"},
+                {"ç", "Bosib tursangiz — c; boşqa harflarda ham burçakdagi belgi yoziladi"},
+                {"📋", "Takliflar qatorida — oxirgi nusxalangan matnlar"},
+                {"␣␣", "Böş joyni ikki marta bossangiz — nuqta qöyiladi"},
+        };
+        for (int i = 0; i < items.length; i++) {
+            if (i > 0) tips.addView(ui.divider());
+            TextView icon = ui.text(items[i][0], 16, ui.accent, true);
+            icon.setGravity(Gravity.CENTER);
+            icon.setMinWidth(ui.px(40));
+            LinearLayout r = ui.row(items[i][1], null, null, null);
+            r.addView(icon, 0);
+            ((LinearLayout.LayoutParams) icon.getLayoutParams()).rightMargin = ui.px(12);
+            tips.addView(r);
         }
-
-        col.addView(step("Takliflar", textColor));
-        CheckBox sug = new CheckBox(this);
-        sug.setText("Söz yozayotganda takliflarni körsatiş");
-        sug.setTextColor(textColor);
-        sug.setTextSize(16);
-        sug.setChecked(Prefs.suggestions(this));
-        sug.setOnCheckedChangeListener((b, on) -> Prefs.setSuggestions(this, on));
-        col.addView(sug);
-        col.addView(button("Örganilgan sözlarni öçiriş", v -> {
-            KlaviaturaService.clearLearned(this);
-            Toast.makeText(this, "Örganilgan sözlar öçirildi", Toast.LENGTH_SHORT).show();
-        }));
-
-        // ---- Ranglar ----
-        col.addView(step("Ranglar", textColor));
-        preview = new KlaviaturaView(this);
-        preview.setRows(Lang.create(this, Lang.UZ).letters, false, Lang.create(this, Lang.UZ));
-        preview.setSuggestions(java.util.Arrays.asList("salom", "salomat", "salomlar"));
-        preview.setEnabled(false);
-        preview.setClickable(false);
-        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        plp.bottomMargin = px(12);
-        col.addView(preview, plp);
-
-        HorizontalScrollView hs = new HorizontalScrollView(this);
-        hs.setHorizontalScrollBarEnabled(false);
-        presetRow = new LinearLayout(this);
-        hs.addView(presetRow);
-        col.addView(hs);
-        for (int i = 0; i < Theme.PRESET_IDS.length; i++) {
-            final String id = Theme.PRESET_IDS[i];
-            Button b = button(Theme.PRESET_NAMES[i], v -> {
-                Theme.setPreset(this, id);
-                refreshTheme();
-            });
-            b.setTag(id);
-            presetRow.addView(b);
-        }
-
-        String[] colorNames = {"Fon", "Tugmalar", "Harflar", "Urğu rangi"};
-        for (int i = 0; i < 4; i++) {
-            final int which = i;
-            LinearLayout row = new LinearLayout(this);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(0, px(10), 0, px(10));
-            View chip = new View(this);
-            colorChips[i] = chip;
-            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(px(36), px(36));
-            clp.rightMargin = px(14);
-            row.addView(chip, clp);
-            TextView name = text(colorNames[i], 16, textColor);
-            row.addView(name);
-            row.setOnClickListener(v -> pickColor(which, colorNames[which]));
-            col.addView(row);
-        }
-        refreshTheme();
-
-        // ---- Ölçam ----
-        col.addView(step("Ölçam", textColor));
-        col.addView(text("Klaviatura balandligi", 14, mutedColor));
-        heightRow = new LinearLayout(this);
-        for (int i = 0; i < Prefs.HEIGHT_IDS.length; i++) {
-            final String id = Prefs.HEIGHT_IDS[i];
-            Button b = button(Prefs.HEIGHT_NAMES[i], v -> {
-                Prefs.setHeight(this, id);
-                refreshSizes();
-            });
-            b.setTag(id);
-            heightRow.addView(b, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        }
-        col.addView(heightRow);
-        TextView bottomHint = text("Pastdan qöşimça joy — telefonning ∨ va 🌐 tugmalari "
-                + "klaviaturaga tegib tursa, kattaroq qiymat tanlang", 14, mutedColor);
-        bottomHint.setPadding(0, px(12), 0, 0);
-        col.addView(bottomHint);
-        bottomRow = new LinearLayout(this);
-        for (int dp : Prefs.EXTRA_BOTTOM) {
-            Button b = button(dp == 0 ? "Yöq" : dp + " dp", v -> {
-                Prefs.setExtraBottom(this, dp);
-                refreshSizes();
-            });
-            b.setTag(dp);
-            bottomRow.addView(b, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        }
-        col.addView(bottomRow);
-        CheckBox nr = new CheckBox(this);
-        nr.setText("Harflar ustida raqamlar qatori");
-        nr.setTextColor(textColor);
-        nr.setTextSize(16);
-        nr.setChecked(Prefs.numberRow(this));
-        nr.setOnCheckedChangeListener((b, on) -> {
-            Prefs.setNumberRow(this, on);
-            Lang uz = Lang.create(this, Lang.UZ);
-            preview.setRows(uz.letters, false, uz);
-        });
-        col.addView(nr);
-        CheckBox pv = new CheckBox(this);
-        pv.setText("Bosilgan harfni kattalaştirib körsatiş");
-        pv.setTextColor(textColor);
-        pv.setTextSize(16);
-        pv.setChecked(Prefs.keyPreview(this));
-        pv.setOnCheckedChangeListener((b, on) -> Prefs.setKeyPreview(this, on));
-        col.addView(pv);
-        refreshSizes();
-
-        // ---- Harf joylari ----
-        col.addView(step("Harf joylari", textColor));
-        col.addView(text("Har bir til uçun harflarning joyini özingizga qulay qilib almaştiring.",
-                14, mutedColor));
-        col.addView(button("Joylaşuvni tahrirlaş", v ->
-                startActivity(new Intent(this, LayoutEditorActivity.class))));
-
-        TextView tips = text(
-                "Maslahatlar\n"
-                        + "• ⇧ tugmasini ikki marta bossangiz — doimiy boş harf.\n"
-                        + "• Yuqori qatordagi harfni bosib tursangiz — raqam yoziladi.\n"
-                        + "• Böş joyni ikki marta bossangiz — nuqta qöyiladi.\n"
-                        + "• Raqam, telefon va SMS-kod maydonlarida katta raqamli klaviatura özi oçiladi.\n"
-                        + "• Takliflar qatoridagi 📋 — oxirgi nusxalangan matnlar, ⚙ — şu sozlamalar.\n"
-                        + "• 🌐 yoki böş joyni bosib tursangiz — boşqa klaviaturaga ötasiz.\n"
-                        + "• T9: har harf uçun tugmani bir marta bosing, söz özi topiladi. "
-                        + "Luğatda yöq sözni yoziş uçun pastki öng tugma bilan «abc» rejimiga öting.\n"
-                        + "• Klaviatura siz yozgan sözlarni faqat şu telefonda eslab qoladi, "
-                        + "heç qayerga yubormaydi.",
-                15, mutedColor);
-        tips.setPadding(0, px(24), 0, 0);
-        tips.setLineSpacing(px(4), 1f);
         col.addView(tips);
 
-        String version = "";
-        try {
-            version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-        } catch (Exception ignored) {
-            // versiya topilmasa — böş
-        }
-        TextView about = text("Dasturçi: J.Imomnazarov\nVersiya: " + version, 14, textColor);
-        about.setPadding(0, px(24), 0, 0);
-        col.addView(about);
-
-        TextView credits = text(
-                "Luğatlar: özbekça — kaharjan/uzb-frequent-words (GPL-3.0); "
-                        + "qoraqalpoqça — shagalalab/sozlik (MIT); "
-                        + "inglizça va rusça — hermitdave/FrequencyWords (CC BY-SA 4.0).",
-                12, mutedColor);
-        credits.setPadding(0, px(20), 0, 0);
-        col.addView(credits);
-
-        setContentView(scroll);
+        TextView foot = ui.text("Dasturçi: J.Imomnazarov", 13, ui.muted, false);
+        foot.setGravity(Gravity.CENTER);
+        foot.setPadding(0, ui.px(22), 0, 0);
+        col.addView(foot);
     }
 
     @Override
@@ -279,126 +173,26 @@ public class MainActivity extends Activity {
                 }
             }
         }
-        String current = Settings.Secure.getString(getContentResolver(),
-                Settings.Secure.DEFAULT_INPUT_METHOD);
+        String current = Settings.Secure.getString(getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
         boolean selected = current != null && current.startsWith(getPackageName() + "/");
-        String s;
-        if (selected) s = "✓ Klaviatura yoqilgan va tanlangan. Yozişingiz mumkin!";
-        else if (enabled) s = "✓ Klaviatura yoqilgan. Endi uni tanlang (2-qadam).";
-        else s = "Klaviatura hali yoqilmagan (1-qadam).";
-        status.setText(s);
-    }
-
-    @Override
-    protected void onRestart() {
-        super.onRestart();
-        if (preview != null) {
-            Lang uz = Lang.create(this, Lang.UZ);
-            preview.setRows(uz.letters, false, uz);
+        int dot;
+        if (selected) {
+            statusTitle.setText("Hammasi tayyor");
+            statusText.setText("Klaviatura yoqilgan va tanlangan. Yozişingiz mumkin!");
+            dot = 0xFF2F9E44;
+        } else if (enabled) {
+            statusTitle.setText("Bir qadam qoldi");
+            statusText.setText("Klaviatura yoqilgan. Endi uni asosiy qilib tanlang.");
+            dot = 0xFFE8A30C;
+        } else {
+            statusTitle.setText("Klaviatura hali yoqilmagan");
+            statusText.setText("Quyidagi ikki qadamni bajaring.");
+            dot = 0xFFD9480F;
         }
-    }
-
-    private void refreshSizes() {
-        preview.loadSizes();
-        String h = Prefs.height(this);
-        for (int i = 0; i < heightRow.getChildCount(); i++) {
-            View b = heightRow.getChildAt(i);
-            b.setAlpha(h.equals(b.getTag()) ? 1f : 0.5f);
-        }
-        int extra = Prefs.extraBottom(this);
-        for (int i = 0; i < bottomRow.getChildCount(); i++) {
-            View b = bottomRow.getChildAt(i);
-            b.setAlpha(Integer.valueOf(extra).equals(b.getTag()) ? 1f : 0.5f);
-        }
-    }
-
-    private void refreshTheme() {
-        Theme t = Theme.load(this);
-        preview.applyTheme(t);
-        for (int i = 0; i < 4; i++) {
-            GradientDrawable d = new GradientDrawable();
-            d.setShape(GradientDrawable.OVAL);
-            d.setColor(t.base(i));
-            d.setStroke(px(1), mutedColor);
-            colorChips[i].setBackground(d);
-        }
-        String mode = Theme.mode(this);
-        for (int i = 0; i < presetRow.getChildCount(); i++) {
-            View b = presetRow.getChildAt(i);
-            b.setAlpha(mode.equals(b.getTag()) ? 1f : 0.55f);
-        }
-    }
-
-    /** Rang tanlaş oynasi: tayyor ranglar va HEX kod. */
-    private void pickColor(int which, String title) {
-        Theme t = Theme.load(this);
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(px(20), px(12), px(20), 0);
-        GridLayout grid = new GridLayout(this);
-        grid.setColumnCount(5);
-        EditText hex = new EditText(this);
-        hex.setText(Theme.hex(t.base(which)));
-        hex.setSingleLine(true);
-        for (int color : Theme.SWATCHES) {
-            View sw = new View(this);
-            GradientDrawable d = new GradientDrawable();
-            d.setShape(GradientDrawable.OVAL);
-            d.setColor(color);
-            d.setStroke(px(1), 0xFF8A8F99);
-            sw.setBackground(d);
-            GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-            lp.width = px(40);
-            lp.height = px(40);
-            lp.setMargins(px(6), px(6), px(6), px(6));
-            sw.setOnClickListener(v -> hex.setText(Theme.hex(color)));
-            grid.addView(sw, lp);
-        }
-        box.addView(grid);
-        TextView hint = text("HEX kod (masalan, #0E7C86):", 14, 0xFF8A8F99);
-        hint.setPadding(0, px(12), 0, 0);
-        box.addView(hint);
-        box.addView(hex);
-        new AlertDialog.Builder(this)
-                .setTitle(title)
-                .setView(box)
-                .setPositiveButton("Tayyor", (d, w) -> {
-                    Integer c = Theme.parseHex(hex.getText().toString());
-                    if (c == null) {
-                        Toast.makeText(this, "HEX kod nötöğri", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    Theme.setColor(this, which, c);
-                    refreshTheme();
-                })
-                .setNegativeButton("Bekor qiliş", null)
-                .show();
-    }
-
-    private TextView text(String s, float sizeSp, int color) {
-        TextView t = new TextView(this);
-        t.setText(s);
-        t.setTextSize(sizeSp);
-        t.setTextColor(color);
-        return t;
-    }
-
-    private TextView step(String s, int color) {
-        TextView t = text(s, 17, color);
-        t.setTypeface(Typeface.DEFAULT_BOLD);
-        t.setPadding(0, px(24), 0, px(8));
-        return t;
-    }
-
-    private Button button(String label, View.OnClickListener onClick) {
-        Button b = new Button(this);
-        b.setText(label);
-        b.setAllCaps(false);
-        b.setOnClickListener(onClick);
-        return b;
-    }
-
-    private int px(float dp) {
-        return Math.round(dp * density);
+        GradientDrawable g = new GradientDrawable();
+        g.setShape(GradientDrawable.OVAL);
+        g.setColor(dot);
+        statusDot.setBackground(g);
+        setupCard.setVisibility(selected ? View.GONE : View.VISIBLE);
     }
 }

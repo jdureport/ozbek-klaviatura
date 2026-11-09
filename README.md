@@ -3,10 +3,11 @@
 Özbek tilining 2026-yilgi lotin alifbosi uçun Android klaviaturasi: 28 harf va ʼ belgisi.
 
 ```
-q ş e r t y u i o ö p
- a s d f g ğ h j k l
+1 2 3 4 5 6 7 8 9 0
+q e r t y u i o ö p
+a s ş d f g ğ h j k l
 ⇧ z x ç v b n m ʼ ⌫
-?123  ,  [ böş joy ]  .  ↵
+123  😊  ,  [◂ til ▸]  .  ↵
 ```
 
 ## Yuklab oliş
@@ -28,7 +29,9 @@ Har bir özgarişdan keyin GitHub Actions APK'ni avtomatik yiğadi. Tayyor fayln
 - Harf joylarini özgartiriş (har bir til uçun)
 - Bufer paneli (📋) va sozlamalar tugmasi (⚙)
 - Balandlik (Ixçam / Oddiy / Baland), pastki böşliq, bosilgan harfni kattalaştirib körsatiş
-- Gboard uslubi: raqamlar qatori, harflar ustida belgilar, dumaloq ?123 va ↵
+- Gboard uslubi: raqamlar qatori, harflar ustida belgilar, dumaloq 123 va ↵
+- Emoji paneli (😊), böş joyni surib til almaştiriş, 123 ni bosib turib raqamli klaviatura
+- Alohida, zamonaviy sozlamalar ekrani
 
 ## Luğatlar
 

@@ -118,6 +118,8 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     private final java.util.LinkedList<String> clips = new java.util.LinkedList<>();
     private ClipboardManager clipboard;
     private boolean clipMode;
+    private boolean emojiMode;
+    private int emojiCat = 1;
     private final ClipboardManager.OnPrimaryClipChangedListener clipListener = this::captureClip;
 
     // ---- Hayot sikli ----
@@ -195,6 +197,30 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
         return rows;
     }
 
+    /** Emoji paneli: 4×8 emoji va pastda bölimlar. */
+    private List<List<Key>> emojiRows() {
+        List<String> list = Emoji.category(this, emojiCat);
+        List<List<Key>> rows = new ArrayList<>();
+        for (int r = 0; r < 4; r++) {
+            List<Key> row = new ArrayList<>();
+            for (int c = 0; c < 8; c++) {
+                int i = r * 8 + c;
+                row.add(new Key(Key.EMOJI, i < list.size() ? list.get(i) : "", null, 1.25f));
+            }
+            rows.add(row);
+        }
+        List<Key> bottom = new ArrayList<>();
+        bottom.add(Key.special(Key.TO_LETTERS, lang.t9 ? "T9" : lang.abc, 1.5f));
+        for (int i = 0; i < Emoji.ICONS.length; i++) {
+            Key k = new Key(Key.EMOJI_CAT, Emoji.ICONS[i], i == emojiCat ? "1" : null, 1f);
+            k.index = i;
+            bottom.add(k);
+        }
+        bottom.add(Key.special(Key.DELETE, "", 1.5f));
+        rows.add(bottom);
+        return rows;
+    }
+
     private static Key blankClip() {
         Key k = new Key(Key.CLIP, "", null, 2f);
         k.index = -1;
@@ -203,7 +229,7 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
 
     private void openSettings() {
         finishComposing();
-        Intent i = new Intent(this, MainActivity.class);
+        Intent i = new Intent(this, SettingsActivity.class);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(i);
         requestHideSelf(0);
@@ -238,6 +264,7 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
         symbols = false;
         padOff = false;
         clipMode = false;
+        emojiMode = false;
         pad = cls == InputType.TYPE_CLASS_PHONE ? 2
                 : (cls == InputType.TYPE_CLASS_NUMBER || cls == InputType.TYPE_CLASS_DATETIME) ? 1 : 0;
         suggestOn = Prefs.suggestions(this) && textClass && !password && !noSuggest;
@@ -314,15 +341,13 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
         return pad != 0 && !padOff;
     }
 
-    private void nextLang() {
+    private void nextLang(int dir) {
         finishComposing();
         List<String> enabled = Prefs.enabledLangs(this);
-        if (enabled.size() <= 1) {
-            switchToNextInputMethod(false);
-            return;
-        }
+        if (enabled.size() <= 1) return;
         int i = enabled.indexOf(lang.id);
-        String next = enabled.get((i + 1) % enabled.size());
+        if (i < 0) i = 0;
+        String next = enabled.get(((i + dir) % enabled.size() + enabled.size()) % enabled.size());
         selectLang(next, true);
         EditorInfo ei = getCurrentInputEditorInfo();
         boolean textField = ei != null && (ei.inputType & InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_TEXT;
@@ -334,7 +359,7 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     }
 
     private boolean t9Layout() {
-        return lang.t9 && !symbols && !inPad() && !clipMode;
+        return lang.t9 && !symbols && !inPad() && !clipMode && !emojiMode;
     }
 
     private boolean predictive() {
@@ -391,14 +416,32 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
                 break;
             case Key.TO_LETTERS:
                 symbols = false;
-                if (!clipMode) padOff = true;
+                if (!clipMode && !emojiMode) padOff = true;
                 clipMode = false;
+                emojiMode = false;
                 applyLayer();
                 updateAutoCaps();
                 refreshSuggestions();
                 break;
             case Key.LANG:
-                nextLang();
+                nextLang(1);
+                break;
+            case Key.EMOJI_KEY:
+                finishComposing();
+                emojiMode = true;
+                emojiCat = Emoji.recent(this).isEmpty() ? 1 : 0;
+                applyLayer();
+                refreshSuggestions();
+                break;
+            case Key.EMOJI:
+                if (!key.text.isEmpty()) {
+                    commit(key.text);
+                    Emoji.addRecent(this, key.text);
+                }
+                break;
+            case Key.EMOJI_CAT:
+                emojiCat = key.index;
+                applyLayer();
                 break;
             case Key.T9MODE:
                 finishComposing();
@@ -445,6 +488,11 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     }
 
     @Override
+    public void onSpaceSwipe(int direction) {
+        nextLang(direction);
+    }
+
+    @Override
     public boolean onKeyLongPress(Key key) {
         switch (key.type) {
             case Key.CHAR:
@@ -457,7 +505,17 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
                 finishComposing();
                 commit(key.text);
                 return true;
+            case Key.TO_SYMBOLS:
+                // 123 ni bosib turiş — raqamli klaviatura
+                finishComposing();
+                pad = 1;
+                padOff = false;
+                symbols = false;
+                applyLayer();
+                refreshSuggestions();
+                return true;
             case Key.SPACE:
+            case Key.EMOJI_KEY:
             case Key.LANG: {
                 finishComposing();
                 InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
@@ -528,7 +586,7 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     private void refreshSuggestions() {
         if (view == null) return;
         view.setStripVisible(true);
-        if (!suggestOn || symbols || clipMode || !dict.isReady()) {
+        if (!suggestOn || symbols || clipMode || emojiMode || !dict.isReady()) {
             setShown(new ArrayList<>(), "");
             return;
         }
@@ -716,7 +774,9 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
 
     private void applyLayer() {
         if (view == null || lang == null) return;
-        if (clipMode) {
+        if (emojiMode) {
+            view.setRows(emojiRows(), true, lang);
+        } else if (clipMode) {
             view.setRows(clipRows(), true, lang);
         } else if (inPad()) {
             view.setRows(pad == 2 ? lang.phonePad : lang.numberPad, true, lang);
@@ -724,7 +784,7 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
             view.setRows(symbols ? lang.symbols : lang.letters, symbols, lang);
         }
         view.setShiftState(shift);
-        view.setSpaceLabel(lang.label);
+        view.setSpaceLabel(Prefs.enabledLangs(this).size() > 1 ? "◂  " + lang.label + "  ▸" : lang.label);
         view.setModeLabel(predictive() ? "T9" : "abc");
     }
 

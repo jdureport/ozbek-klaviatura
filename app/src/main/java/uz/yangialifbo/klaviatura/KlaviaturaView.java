@@ -32,6 +32,8 @@ public class KlaviaturaView extends View {
         void onKeyUp(Key key);
         void onKeyTap(Key key);
         boolean onKeyLongPress(Key key);
+        /** Böş joyni surib til almaştiriş: +1 — keyingi, -1 — oldingi. */
+        void onSpaceSwipe(int direction);
     }
 
     public static final int SHIFT_OFF = 0;
@@ -64,6 +66,8 @@ public class KlaviaturaView extends View {
             new Key(Key.TOOL_CLIP, "", null, 1f), new Key(Key.TOOL_SETTINGS, "", null, 1f)};
     private final Path clipPath = new Path();
     private final Path gearPath = new Path();
+    private final Path smilePath = new Path();
+    private float emojiSize, emojiCatSize, swipeSlop;
     /** Tizim navigatsiya paneli balandligi (Android 15+ da klaviatura uning ostigaça çizadi). */
     private int navInset;
     private boolean previewOn = true;
@@ -85,6 +89,7 @@ public class KlaviaturaView extends View {
 
     private final class Press implements Runnable {
         Key key;
+        float startX;
         boolean consumed;
 
         Press(Key key) {
@@ -165,6 +170,12 @@ public class KlaviaturaView extends View {
         clipPath.moveTo(8.5f, 15);
         clipPath.lineTo(13.5f, 15);
 
+        smilePath.addCircle(12, 12, 9, Path.Direction.CW);
+        smilePath.addCircle(9, 10, 0.6f, Path.Direction.CW);
+        smilePath.addCircle(15, 10, 0.6f, Path.Direction.CW);
+        smilePath.moveTo(8, 14);
+        smilePath.quadTo(12, 18, 16, 14);
+
         gearPath.addCircle(12, 12, 6.5f, Path.Direction.CW);
         gearPath.addCircle(12, 12, 2.5f, Path.Direction.CW);
         for (int i = 0; i < 8; i++) {
@@ -201,6 +212,9 @@ public class KlaviaturaView extends View {
         t9DigitSize = sp(dm, 22);
         t9LettersSize = sp(dm, 13);
         previewOn = Prefs.keyPreview(getContext());
+        emojiSize = sp(dm, 27);
+        emojiCatSize = sp(dm, 19);
+        swipeSlop = dp(dm, 28);
         previewSize = sp(dm, 30);
         if (getWidth() > 0) layoutKeys(getWidth());
         requestLayout();
@@ -492,6 +506,19 @@ public class KlaviaturaView extends View {
         drawRect.set(k.rect.left + gapH / 2f, k.rect.top + gapV / 2f,
                 k.rect.right - gapH / 2f, k.rect.bottom - gapV / 2f);
 
+        if (k.type == Key.EMOJI || k.type == Key.EMOJI_CAT) {
+            boolean selected = k.type == Key.EMOJI_CAT && "1".equals(k.alt);
+            if (pressed || selected) {
+                keyPaint.setColor(selected ? Theme.mix(c.specialKey, c.accent, 0.3f) : c.pressed);
+                float rr = Math.min(drawRect.height(), drawRect.width()) / 2f;
+                canvas.drawRoundRect(drawRect, rr, rr, keyPaint);
+            }
+            if (!k.text.isEmpty()) {
+                drawText(canvas, k.text, k.type == Key.EMOJI ? emojiSize : emojiCatSize, c.text);
+            }
+            return;
+        }
+
         boolean accent = k.type == Key.ENTER || (k.type == Key.SHIFT && shiftState == SHIFT_LOCK);
         boolean special = k.type != Key.CHAR && k.type != Key.SPACE && k.type != Key.T9
                 && k.type != Key.CLIP;
@@ -560,6 +587,11 @@ public class KlaviaturaView extends View {
                 iconPaint.setStyle(Paint.Style.STROKE);
                 iconPaint.setColor(fg);
                 drawIcon(canvas, globePath);
+                break;
+            case Key.EMOJI_KEY:
+                iconPaint.setStyle(Paint.Style.STROKE);
+                iconPaint.setColor(fg);
+                drawIcon(canvas, smilePath);
                 break;
             case Key.T9MODE:
                 drawText(canvas, modeLabel, specialSize, fg);
@@ -647,6 +679,7 @@ public class KlaviaturaView extends View {
                     }
                 }
                 Press p = new Press(k);
+                p.startX = e.getX(idx);
                 presses.put(e.getPointerId(idx), p);
                 performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
                 if (listener != null) listener.onKeyDown(k);
@@ -657,6 +690,17 @@ public class KlaviaturaView extends View {
             case MotionEvent.ACTION_MOVE: {
                 for (int i = 0; i < e.getPointerCount(); i++) {
                     Press p = presses.get(e.getPointerId(i));
+                    if (p != null && !p.consumed && p.key.type == Key.SPACE) {
+                        float dx = e.getX(i) - p.startX;
+                        if (Math.abs(dx) > swipeSlop) {
+                            handler.removeCallbacks(p);
+                            p.consumed = true;
+                            performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                            if (listener != null) listener.onSpaceSwipe(dx > 0 ? 1 : -1);
+                            invalidate();
+                        }
+                        continue;
+                    }
                     if (p == null || p.consumed || p.key.type != Key.CHAR) continue;
                     Key k = findKey(e.getX(i), e.getY(i));
                     if (k != null && k != p.key && k.type == Key.CHAR) {

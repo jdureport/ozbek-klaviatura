@@ -29,6 +29,10 @@ public final class Key {
     /** Takliflar qatoridagi asboblar: bufer va sozlamalar. */
     public static final int TOOL_CLIP = 16;
     public static final int TOOL_SETTINGS = 17;
+    /** Emoji: panel içidagi emoji, pastki qatordagi 😊 tugmasi, bölim tugmasi. */
+    public static final int EMOJI = 18;
+    public static final int EMOJI_KEY = 19;
+    public static final int EMOJI_CAT = 20;
 
     public final int type;
     /** Tugmada körinadigan va yoziladigan matn. */
