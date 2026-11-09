@@ -12,6 +12,8 @@ import android.view.View;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.Toast;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -76,17 +78,60 @@ public class MainActivity extends Activity {
         col.addView(test, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
+        col.addView(step("Tillar", textColor));
+        TextView langHint = text("🌐 tugmasi yoqilgan tillar orasida almaştiradi.", 14, mutedColor);
+        col.addView(langHint);
+        for (String id : Lang.ALL) {
+            CheckBox cb = new CheckBox(this);
+            cb.setText(Lang.settingsName(id));
+            cb.setTextColor(textColor);
+            cb.setTextSize(16);
+            cb.setChecked(Prefs.langEnabled(this, id));
+            cb.setOnCheckedChangeListener((b, on) -> {
+                Prefs.setLangEnabled(this, id, on);
+                if (!on && Prefs.enabledLangs(this).size() == 1
+                        && !Prefs.langEnabled(this, Prefs.enabledLangs(this).get(0))) {
+                    Prefs.setLangEnabled(this, Lang.UZ, true);
+                }
+            });
+            col.addView(cb);
+        }
+
+        col.addView(step("Takliflar", textColor));
+        CheckBox sug = new CheckBox(this);
+        sug.setText("Söz yozayotganda takliflarni körsatiş");
+        sug.setTextColor(textColor);
+        sug.setTextSize(16);
+        sug.setChecked(Prefs.suggestions(this));
+        sug.setOnCheckedChangeListener((b, on) -> Prefs.setSuggestions(this, on));
+        col.addView(sug);
+        col.addView(button("Örganilgan sözlarni öçiriş", v -> {
+            KlaviaturaService.clearLearned(this);
+            Toast.makeText(this, "Örganilgan sözlar öçirildi", Toast.LENGTH_SHORT).show();
+        }));
+
         TextView tips = text(
                 "Maslahatlar\n"
                         + "• ⇧ tugmasini ikki marta bossangiz — doimiy boş harf.\n"
                         + "• Yuqori qatordagi harfni bosib tursangiz — raqam yoziladi.\n"
-                        + "• Vergul va nuqtani bosib tursangiz — «-» va «?».\n"
                         + "• Böş joyni ikki marta bossangiz — nuqta qöyiladi.\n"
-                        + "• Böş joyni bosib tursangiz — boşqa klaviaturaga ötasiz.",
+                        + "• 🌐 yoki böş joyni bosib tursangiz — boşqa klaviaturaga ötasiz.\n"
+                        + "• T9: har harf uçun tugmani bir marta bosing, söz özi topiladi. "
+                        + "Luğatda yöq sözni yoziş uçun pastki öng tugma bilan «abc» rejimiga öting.\n"
+                        + "• Klaviatura siz yozgan sözlarni faqat şu telefonda eslab qoladi, "
+                        + "hech qayerga yubormaydi.",
                 15, mutedColor);
         tips.setPadding(0, px(24), 0, 0);
         tips.setLineSpacing(px(4), 1f);
         col.addView(tips);
+
+        TextView credits = text(
+                "Luğatlar: özbekça — kaharjan/uzb-frequent-words (GPL-3.0); "
+                        + "qoraqalpoqça — shagalalab/sozlik (MIT); "
+                        + "inglizça va rusça — hermitdave/FrequencyWords (CC BY-SA 4.0).",
+                12, mutedColor);
+        credits.setPadding(0, px(20), 0, 0);
+        col.addView(credits);
 
         setContentView(scroll);
     }

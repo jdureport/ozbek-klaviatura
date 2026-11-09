@@ -1,5 +1,6 @@
 package uz.yangialifbo.klaviatura;
 
+import android.content.Context;
 import android.inputmethodservice.InputMethodService;
 import android.os.Handler;
 import android.os.Looper;
@@ -11,8 +12,12 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /** Klaviatura servisi: tugma bosişlarini matnga aylantiradi. */
 public class KlaviaturaService extends InputMethodService implements KlaviaturaView.Listener {
@@ -20,6 +25,37 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     private static final long DOUBLE_TAP_MS = 400;
     private static final long REPEAT_START_MS = 400;
     private static final long REPEAT_MS = 50;
+    private static final long MULTITAP_MS = 900;
+    private static final String PUNCT = ".,?!-:;";
+    private static final int SHOWN = 3;
+
+    // ---- Luğatlar (barça oynalar uçun umumiy) ----
+    private static final Map<String, Dictionary> DICTS = new HashMap<>();
+    private static final ExecutorService IO = Executors.newSingleThreadExecutor();
+
+    static synchronized Dictionary dictionary(Context context, String name) {
+        Dictionary d = DICTS.get(name);
+        if (d == null) {
+            d = new Dictionary(name, "uz".equals(name));
+            DICTS.put(name, d);
+            final Dictionary fd = d;
+            final Context app = context.getApplicationContext();
+            IO.execute(() -> fd.load(app));
+        }
+        return d;
+    }
+
+    static void clearLearned(Context context) {
+        final Context app = context.getApplicationContext();
+        for (String name : new String[]{"uz", "kaa", "en", "ru"}) {
+            dictionary(app, name);
+        }
+        IO.execute(() -> {
+            synchronized (KlaviaturaService.class) {
+                for (Dictionary d : DICTS.values()) d.clearLearned(app);
+            }
+        });
+    }
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable repeatDelete = new Runnable() {
@@ -31,20 +67,43 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     };
 
     private KlaviaturaView view;
-    private List<List<Key>> letterRows;
-    private List<List<Key>> symbolRows;
+    private final Map<String, Lang> langs = new HashMap<>();
+    private Lang lang;
+    private Dictionary dict;
     private boolean symbols;
     private int shift = KlaviaturaView.SHIFT_OFF;
     private long lastShiftTap;
     private long lastSpaceTap;
 
+    // Joriy maydon
+    private boolean suggestOn;      // takliflar körsatiladimi
+    private boolean learnOn;        // sözlar eslab qolinadimi
+    private boolean forceMultitap;  // parol maydonida T9 luğatsiz
+
+    // T9 holati
+    private boolean t9Predictive = true;
+    private final StringBuilder t9Seq = new StringBuilder();
+    private List<String> t9Cands = new ArrayList<>();
+    private String t9Raw = "";
+    private boolean capFirst, capAll;
+    private final StringBuilder mtWord = new StringBuilder();
+    private char mtLastDigit;
+    private int mtIndex;
+    private long mtTime;
+    private long lastPunctTime;
+    private int punctIndex;
+    private boolean punctActive;
+
+    /** Takliflar qatoridagi sözlar (kiçik harfda). */
+    private List<String> shownRaw = new ArrayList<>();
+
+    // ---- Hayot sikli ----
+
     @Override
     public View onCreateInputView() {
         view = new KlaviaturaView(this);
         view.setListener(this);
-        letterRows = Layouts.letters();
-        symbolRows = Layouts.symbols();
-        applyLayer();
+        selectLang(Prefs.currentLang(this));
         return view;
     }
 
@@ -56,22 +115,40 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     @Override
     public void onStartInputView(EditorInfo info, boolean restarting) {
         super.onStartInputView(info, restarting);
+        resetComposingState();
         int cls = info.inputType & InputType.TYPE_MASK_CLASS;
+        int variation = info.inputType & InputType.TYPE_MASK_VARIATION;
+        boolean password = cls == InputType.TYPE_CLASS_TEXT
+                && (variation == InputType.TYPE_TEXT_VARIATION_PASSWORD
+                || variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                || variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD);
+        boolean noSuggest = (info.inputType & InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) != 0;
+        boolean textClass = cls == InputType.TYPE_CLASS_TEXT;
         symbols = cls == InputType.TYPE_CLASS_NUMBER
                 || cls == InputType.TYPE_CLASS_PHONE
                 || cls == InputType.TYPE_CLASS_DATETIME;
+        suggestOn = Prefs.suggestions(this) && textClass && !password && !noSuggest;
+        learnOn = suggestOn
+                && variation != InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+                && variation != InputType.TYPE_TEXT_VARIATION_URI;
+        forceMultitap = password;
+        t9Predictive = Prefs.t9Predictive(this);
         shift = KlaviaturaView.SHIFT_OFF;
-        if (view != null) {
-            view.setEnterLabel(enterLabel(info));
-            applyLayer();
-        }
+
+        String current = Prefs.currentLang(this);
+        if (!Prefs.enabledLangs(this).contains(current)) current = Prefs.enabledLangs(this).get(0);
+        selectLang(current);
+        if (view != null) view.setEnterLabel(enterLabel(info));
         updateAutoCaps();
+        refreshSuggestions();
     }
 
     @Override
     public void onFinishInputView(boolean finishingInput) {
         super.onFinishInputView(finishingInput);
         handler.removeCallbacks(repeatDelete);
+        finishComposing();
+        saveDictionaries();
     }
 
     @Override
@@ -79,7 +156,55 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
                                   int candidatesStart, int candidatesEnd) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd,
                 candidatesStart, candidatesEnd);
+        if (isComposing()) {
+            // Foydalanuvçi kursorni boşqa joyga surdi — sözni tugatamiz.
+            // (candidatesEnd < 0 — eski, keçikib kelgan xabar, uni eʼtiborsiz qoldiramiz.)
+            if (candidatesEnd >= 0 && (newSelStart != candidatesEnd || newSelEnd != candidatesEnd)) {
+                InputConnection ic = getCurrentInputConnection();
+                if (ic != null) ic.finishComposingText();
+                resetComposingState();
+                updateAutoCaps();
+                refreshSuggestions();
+            }
+            return;
+        }
         updateAutoCaps();
+        refreshSuggestions();
+    }
+
+    // ---- Til ----
+
+    private void selectLang(String id) {
+        Lang l = langs.get(id);
+        if (l == null) {
+            l = Lang.create(id);
+            langs.put(id, l);
+        }
+        lang = l;
+        dict = dictionary(this, l.dict);
+        Prefs.setCurrentLang(this, l.id);
+        applyLayer();
+    }
+
+    private void nextLang() {
+        finishComposing();
+        List<String> enabled = Prefs.enabledLangs(this);
+        if (enabled.size() <= 1) {
+            switchToNextInputMethod(false);
+            return;
+        }
+        int i = enabled.indexOf(lang.id);
+        selectLang(enabled.get((i + 1) % enabled.size()));
+        updateAutoCaps();
+        refreshSuggestions();
+    }
+
+    private boolean t9Layout() {
+        return lang.t9 && !symbols;
+    }
+
+    private boolean predictive() {
+        return t9Predictive && !forceMultitap;
     }
 
     // ---- KlaviaturaView.Listener ----
@@ -100,41 +225,48 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
 
     @Override
     public void onKeyTap(Key key) {
+        if (key.type != Key.T9) punctActive = false;
         switch (key.type) {
-            case Key.CHAR: {
-                String t = key.text;
-                if (!symbols && shift != KlaviaturaView.SHIFT_OFF) t = t.toUpperCase(Locale.ROOT);
-                commit(t);
-                if (shift == KlaviaturaView.SHIFT_ONCE) setShift(KlaviaturaView.SHIFT_OFF);
+            case Key.CHAR:
+                typeChar(key.text);
                 break;
-            }
-            case Key.SHIFT: {
-                long now = SystemClock.uptimeMillis();
-                if (shift == KlaviaturaView.SHIFT_OFF) {
-                    setShift(KlaviaturaView.SHIFT_ONCE);
-                } else if (shift == KlaviaturaView.SHIFT_ONCE) {
-                    setShift(now - lastShiftTap < DOUBLE_TAP_MS
-                            ? KlaviaturaView.SHIFT_LOCK : KlaviaturaView.SHIFT_OFF);
-                } else {
-                    setShift(KlaviaturaView.SHIFT_OFF);
-                }
-                lastShiftTap = now;
+            case Key.T9:
+                t9Digit(key.text.charAt(0));
                 break;
-            }
+            case Key.SHIFT:
+                tapShift();
+                break;
             case Key.TO_SYMBOLS:
+                finishComposing();
                 symbols = true;
                 applyLayer();
+                refreshSuggestions();
                 break;
             case Key.TO_LETTERS:
                 symbols = false;
                 applyLayer();
                 updateAutoCaps();
+                refreshSuggestions();
+                break;
+            case Key.LANG:
+                nextLang();
+                break;
+            case Key.T9MODE:
+                finishComposing();
+                t9Predictive = !t9Predictive;
+                Prefs.setT9Predictive(this, t9Predictive);
+                applyLayer();
+                refreshSuggestions();
                 break;
             case Key.SPACE:
                 handleSpace();
                 break;
             case Key.ENTER:
+                finishComposing();
                 handleEnter();
+                break;
+            case Key.SUGGESTION:
+                pickSuggestion(key.index);
                 break;
             default:
                 // DELETE bosilgan zahoti bajariladi (onKeyDown).
@@ -147,10 +279,17 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
         switch (key.type) {
             case Key.CHAR:
                 if (key.alt == null) return false;
+                learnWordBeforeCursor();
                 commit(key.alt);
                 if (shift == KlaviaturaView.SHIFT_ONCE) setShift(KlaviaturaView.SHIFT_OFF);
                 return true;
-            case Key.SPACE: {
+            case Key.T9:
+                finishComposing();
+                commit(key.text);
+                return true;
+            case Key.SPACE:
+            case Key.LANG: {
+                finishComposing();
                 InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
                 if (imm != null) imm.showInputMethodPicker();
                 return true;
@@ -163,12 +302,254 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
         }
     }
 
-    // ---- Yordamçi metodlar ----
+    // ---- Oddiy klaviatura ----
+
+    private void typeChar(String text) {
+        boolean letter = text.length() == 1 && lang.isWordChar(text.charAt(0)) && !symbols;
+        if (!letter) learnWordBeforeCursor();
+        String t = text;
+        if (!symbols && shift != KlaviaturaView.SHIFT_OFF) t = lang.upper(t);
+        commit(t);
+        if (shift == KlaviaturaView.SHIFT_ONCE) setShift(KlaviaturaView.SHIFT_OFF);
+    }
+
+    private void tapShift() {
+        if (t9Layout() && isComposing()) {
+            // T9 da yozilayotgan sözning şakli: kiçik → Boş harf → HAMMASI KATTA
+            if (!capFirst && !capAll) capFirst = true;
+            else if (capFirst && !capAll) capAll = true;
+            else capFirst = capAll = false;
+            showComposing();
+            showSuggestionsFromRaw(predictive() ? t9Cands : shownRaw);
+            return;
+        }
+        long now = SystemClock.uptimeMillis();
+        if (shift == KlaviaturaView.SHIFT_OFF) {
+            setShift(KlaviaturaView.SHIFT_ONCE);
+        } else if (shift == KlaviaturaView.SHIFT_ONCE) {
+            setShift(now - lastShiftTap < DOUBLE_TAP_MS
+                    ? KlaviaturaView.SHIFT_LOCK : KlaviaturaView.SHIFT_OFF);
+        } else {
+            setShift(KlaviaturaView.SHIFT_OFF);
+        }
+        lastShiftTap = now;
+    }
+
+    /** Kursor oldidagi tugallanmagan söz. */
+    private String wordBeforeCursor() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return "";
+        CharSequence before = ic.getTextBeforeCursor(48, 0);
+        if (before == null) return "";
+        int i = before.length();
+        while (i > 0 && lang.isWordChar(before.charAt(i - 1))) i--;
+        String w = before.subSequence(i, before.length()).toString();
+        // söz boşi va oxiridagi tutuq belgisi sözga kirmaydi
+        while (!w.isEmpty() && !Character.isLetter(w.charAt(0))) w = w.substring(1);
+        return w;
+    }
+
+    private void learnWordBeforeCursor() {
+        if (!learnOn || symbols || t9Layout()) return;
+        String w = wordBeforeCursor();
+        if (w.length() >= 2) dict.learn(lang.lower(w));
+    }
+
+    private void refreshSuggestions() {
+        if (view == null) return;
+        view.setStripVisible(suggestOn);
+        if (!suggestOn || symbols || !dict.isReady()) {
+            setShown(new ArrayList<>(), "");
+            return;
+        }
+        if (t9Layout()) {
+            if (!isComposing()) setShown(new ArrayList<>(), "");
+            return;
+        }
+        String typed = wordBeforeCursor();
+        if (typed.isEmpty()) {
+            setShown(new ArrayList<>(), "");
+            return;
+        }
+        setShown(dict.complete(lang.lower(typed), SHOWN), typed);
+    }
+
+    private void setShown(List<String> raw, String typed) {
+        shownRaw = raw;
+        List<String> display = new ArrayList<>(raw.size());
+        for (String w : raw) display.add(lang.matchCase(typed, w));
+        if (view != null) view.setSuggestions(display);
+    }
+
+    private void pickSuggestion(int index) {
+        if (index >= shownRaw.size()) return;
+        String raw = shownRaw.get(index);
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return;
+        if (t9Layout() && isComposing()) {
+            String w = applyCase(raw);
+            ic.commitText(w + " ", 1);
+            if (learnOn) dict.learn(raw);
+            resetComposingState();
+            refreshSuggestions();
+            return;
+        }
+        String typed = wordBeforeCursor();
+        ic.beginBatchEdit();
+        if (!typed.isEmpty()) ic.deleteSurroundingText(typed.length(), 0);
+        ic.commitText(lang.matchCase(typed, raw) + " ", 1);
+        ic.endBatchEdit();
+        if (learnOn) dict.learn(raw);
+        if (shift == KlaviaturaView.SHIFT_ONCE) setShift(KlaviaturaView.SHIFT_OFF);
+    }
+
+    // ---- T9 ----
+
+    private boolean isComposing() {
+        return t9Seq.length() > 0 || mtWord.length() > 0;
+    }
+
+    private void resetComposingState() {
+        t9Seq.setLength(0);
+        t9Cands = new ArrayList<>();
+        t9Raw = "";
+        mtWord.setLength(0);
+        mtLastDigit = 0;
+        capFirst = capAll = false;
+    }
+
+    /** Yozilayotgan sözni matnga qöyib, holatni tozalaş. */
+    private void finishComposing() {
+        if (!isComposing()) return;
+        InputConnection ic = getCurrentInputConnection();
+        String raw = mtWord.length() > 0 ? mtWord.toString() : t9Raw;
+        if (ic != null) ic.commitText(applyCase(raw), 1);
+        learnComposed(raw);
+        resetComposingState();
+    }
+
+    private void learnComposed(String raw) {
+        if (!learnOn || raw.length() < 2) return;
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (!Character.isLetter(c) && c != 'ʼ') return;
+        }
+        // T9 da faqat luğatdan tanlangan yoki harfma-harf yozilgan sözlar eslab qolinadi.
+        if (mtWord.length() > 0 || t9Cands.contains(raw)) dict.learn(raw);
+    }
+
+    private String applyCase(String raw) {
+        if (capAll) return lang.upper(raw);
+        if (capFirst) return lang.capitalize(raw);
+        return raw;
+    }
+
+    private void captureCaps() {
+        capFirst = shift != KlaviaturaView.SHIFT_OFF;
+        capAll = shift == KlaviaturaView.SHIFT_LOCK;
+        if (shift == KlaviaturaView.SHIFT_ONCE) setShift(KlaviaturaView.SHIFT_OFF);
+    }
+
+    private void t9Digit(char d) {
+        if (predictive()) {
+            if (d == '1' && (t9Seq.length() == 0 || dict.t9(t9Seq + "1", 1).isEmpty())) {
+                finishComposing();
+                punctTap();
+                return;
+            }
+            punctActive = false;
+            if (t9Seq.length() == 0) captureCaps();
+            t9Seq.append(d);
+            refreshT9();
+        } else {
+            multitap(d);
+        }
+    }
+
+    private void refreshT9() {
+        String seq = t9Seq.toString();
+        t9Cands = dict.isReady() ? dict.t9(seq, 8) : new ArrayList<>();
+        if (!t9Cands.isEmpty()) {
+            t9Raw = t9Cands.get(0);
+        } else {
+            // Luğatda yöq — har tugmaning birinçi harfi bilan
+            StringBuilder b = new StringBuilder(t9Raw.length() > seq.length()
+                    ? t9Raw.substring(0, seq.length()) : t9Raw);
+            for (int i = b.length(); i < seq.length(); i++) b.append(firstLetter(seq.charAt(i)));
+            t9Raw = b.toString();
+        }
+        showComposing();
+        showSuggestionsFromRaw(t9Cands);
+    }
+
+    private void showSuggestionsFromRaw(List<String> raw) {
+        if (!suggestOn) return;
+        List<String> top = new ArrayList<>(raw.subList(0, Math.min(SHOWN, raw.size())));
+        shownRaw = top;
+        List<String> display = new ArrayList<>();
+        for (String w : top) display.add(applyCase(w));
+        if (view != null) view.setSuggestions(display);
+    }
+
+    private void showComposing() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return;
+        String raw = mtWord.length() > 0 ? mtWord.toString() : t9Raw;
+        ic.setComposingText(applyCase(raw), 1);
+    }
+
+    private static char firstLetter(char digit) {
+        String letters = digit == '1' ? "ʼ" : Layouts.T9_LETTERS[digit - '0'];
+        return letters.charAt(0);
+    }
+
+    private String multitapLetters(char d) {
+        return d == '1' ? "ʼ.,?!-" : Layouts.T9_LETTERS[d - '0'];
+    }
+
+    private void multitap(char d) {
+        String letters = multitapLetters(d);
+        long now = SystemClock.uptimeMillis();
+        if (d == mtLastDigit && now - mtTime < MULTITAP_MS && mtWord.length() > 0) {
+            mtIndex = (mtIndex + 1) % letters.length();
+            mtWord.setCharAt(mtWord.length() - 1, letters.charAt(mtIndex));
+        } else {
+            if (mtWord.length() == 0) captureCaps();
+            mtIndex = 0;
+            mtWord.append(letters.charAt(0));
+        }
+        mtLastDigit = d;
+        mtTime = now;
+        showComposing();
+        if (suggestOn && dict.isReady()) {
+            showSuggestionsFromRaw(dict.complete(mtWord.toString(), SHOWN));
+        }
+    }
+
+    /** "1" tugmasi: tinis belgisi; tez-tez bosilsa — keyingi belgiga almaşadi. */
+    private void punctTap() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return;
+        long now = SystemClock.uptimeMillis();
+        if (punctActive && now - lastPunctTime < MULTITAP_MS) {
+            ic.deleteSurroundingText(1, 0);
+            punctIndex = (punctIndex + 1) % PUNCT.length();
+        } else {
+            punctIndex = 0;
+        }
+        ic.commitText(String.valueOf(PUNCT.charAt(punctIndex)), 1);
+        lastPunctTime = now;
+        punctActive = true;
+    }
+
+    // ---- Umumiy amallar ----
 
     private void applyLayer() {
-        if (view == null) return;
-        view.setRows(symbols ? symbolRows : letterRows, symbols);
+        if (view == null || lang == null) return;
+        view.setRows(symbols ? lang.symbols : lang.letters, symbols, lang);
         view.setShiftState(shift);
+        view.setSpaceLabel(lang.label);
+        view.setModeLabel(predictive() ? "T9" : "abc");
     }
 
     private void setShift(int s) {
@@ -177,7 +558,7 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     }
 
     private void updateAutoCaps() {
-        if (symbols || shift == KlaviaturaView.SHIFT_LOCK) return;
+        if (symbols || shift == KlaviaturaView.SHIFT_LOCK || isComposing()) return;
         EditorInfo ei = getCurrentInputEditorInfo();
         InputConnection ic = getCurrentInputConnection();
         if (ei == null || ic == null || ei.inputType == InputType.TYPE_NULL) return;
@@ -191,13 +572,54 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     }
 
     private void deleteOne() {
+        punctActive = false;
+        if (t9Layout() && isComposing()) {
+            if (mtWord.length() > 0) {
+                mtWord.setLength(mtWord.length() - 1);
+                mtLastDigit = 0;
+                if (mtWord.length() == 0) {
+                    clearComposingText();
+                } else {
+                    showComposing();
+                    if (suggestOn && dict.isReady()) {
+                        showSuggestionsFromRaw(dict.complete(mtWord.toString(), SHOWN));
+                    }
+                }
+            } else {
+                t9Seq.setLength(t9Seq.length() - 1);
+                if (t9Seq.length() == 0) clearComposingText();
+                else refreshT9();
+            }
+            return;
+        }
         sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL);
     }
 
-    /** Ikki marta böş joy bosilsa — nuqta qöyiladi. */
+    private void clearComposingText() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic != null) {
+            ic.setComposingText("", 1);
+            ic.finishComposingText();
+        }
+        resetComposingState();
+        updateAutoCaps();
+        if (view != null) view.setSuggestions(new ArrayList<>());
+        shownRaw = new ArrayList<>();
+    }
+
+    /** Böş joy; ikki marta bosilsa — nuqta qöyiladi. */
     private void handleSpace() {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
+        if (t9Layout() && isComposing()) {
+            String raw = mtWord.length() > 0 ? mtWord.toString() : t9Raw;
+            ic.commitText(applyCase(raw) + " ", 1);
+            learnComposed(raw);
+            resetComposingState();
+            lastSpaceTap = SystemClock.uptimeMillis();
+            return;
+        }
+        learnWordBeforeCursor();
         long now = SystemClock.uptimeMillis();
         boolean done = false;
         if (!symbols && now - lastSpaceTap < 700) {
@@ -219,6 +641,7 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
     }
 
     private void handleEnter() {
+        learnWordBeforeCursor();
         EditorInfo ei = getCurrentInputEditorInfo();
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
@@ -230,6 +653,17 @@ public class KlaviaturaService extends InputMethodService implements KlaviaturaV
         } else {
             sendKeyChar('\n');
         }
+    }
+
+    private void saveDictionaries() {
+        final Context app = getApplicationContext();
+        IO.execute(() -> {
+            List<Dictionary> list;
+            synchronized (KlaviaturaService.class) {
+                list = new ArrayList<>(DICTS.values());
+            }
+            for (Dictionary d : list) d.save(app);
+        });
     }
 
     /** Enter tugmasidagi yozuv; null bölsa — ↵ ikonkasi. */

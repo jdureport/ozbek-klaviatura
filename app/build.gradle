@@ -6,22 +6,32 @@ def buildNumber = (project.findProperty('versionCode') ?: '1').toString().toInte
 
 android {
     namespace = 'uz.yangialifbo.klaviatura'
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = 'uz.yangialifbo.klaviatura'
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = buildNumber
-        versionName = "0.1.${buildNumber}"
+        versionName = "0.2.${buildNumber}"
     }
 
     signingConfigs {
+        // Sinov APK'lari uçun umumiy kalit (repozitoriyda).
         shared {
             storeFile = file('../keystore/klaviatura.jks')
             storePassword = 'yangialifbo'
             keyAlias = 'klaviatura'
             keyPassword = 'yangialifbo'
+        }
+        // Google Play uçun yuklaş kaliti — faqat GitHub Secrets orqali beriladi.
+        if (System.getenv('UPLOAD_KEYSTORE_FILE')) {
+            upload {
+                storeFile = file(System.getenv('UPLOAD_KEYSTORE_FILE'))
+                storePassword = System.getenv('UPLOAD_KEYSTORE_PASSWORD')
+                keyAlias = System.getenv('UPLOAD_KEY_ALIAS')
+                keyPassword = System.getenv('UPLOAD_KEY_PASSWORD')
+            }
         }
     }
 
@@ -29,6 +39,11 @@ android {
         release {
             minifyEnabled = false
             signingConfig = signingConfigs.shared
+        }
+        // Play uçun AAB: yuklaş kaliti bilan imzolanadi.
+        play {
+            initWith release
+            signingConfig = System.getenv('UPLOAD_KEYSTORE_FILE') ? signingConfigs.upload : signingConfigs.shared
         }
         debug {
             signingConfig = signingConfigs.shared

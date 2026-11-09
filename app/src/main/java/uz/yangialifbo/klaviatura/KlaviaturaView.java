@@ -61,6 +61,13 @@ public class KlaviaturaView extends View {
     private final SparseArray<Press> presses = new SparseArray<>();
 
     private List<List<Key>> rows = new ArrayList<>();
+    private final Key[] suggestionKeys = new Key[3];
+    private List<String> suggestions = new ArrayList<>();
+    private boolean stripVisible = true;
+    private Lang lang;
+    private String modeLabel = "T9";
+    private final Path globePath = new Path();
+    private final Paint stripPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Listener listener;
     private int shiftState = SHIFT_OFF;
     private boolean symbols;
@@ -68,7 +75,8 @@ public class KlaviaturaView extends View {
     private String spaceLabel = "Özbek";
 
     private final float rowHeight, sidePad, topPad, bottomPad, gapH, gapV, radius, shadowDy,
-            letterSize, specialSize, spaceSize, hintSize, iconSize, hintInset;
+            letterSize, specialSize, spaceSize, hintSize, iconSize, hintInset, stripHeight,
+            suggestionSize, t9DigitSize, t9LettersSize;
 
     private final class Press implements Runnable {
         Key key;
@@ -109,6 +117,15 @@ public class KlaviaturaView extends View {
         hintSize = sp(dm, 10.5f);
         iconSize = dp(dm, 22);
         hintInset = dp(dm, 5);
+        stripHeight = dp(dm, 42);
+        suggestionSize = sp(dm, 16);
+        t9DigitSize = sp(dm, 22);
+        t9LettersSize = sp(dm, 13);
+        for (int i = 0; i < suggestionKeys.length; i++) {
+            suggestionKeys[i] = new Key(Key.SUGGESTION, "", null, 1f);
+            suggestionKeys[i].index = i;
+        }
+        stripPaint.setStrokeWidth(dp(dm, 1));
 
         boolean night = (getResources().getConfiguration().uiMode
                 & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
@@ -177,6 +194,11 @@ public class KlaviaturaView extends View {
         enterPath.lineTo(5, 13);
         enterPath.lineTo(9.5f, 17.5f);
 
+        globePath.addCircle(12, 12, 9, Path.Direction.CW);
+        globePath.addOval(8, 3, 16, 21, Path.Direction.CW);
+        globePath.moveTo(3, 12);
+        globePath.lineTo(21, 12);
+
         setHapticFeedbackEnabled(true);
     }
 
@@ -194,10 +216,11 @@ public class KlaviaturaView extends View {
         listener = l;
     }
 
-    public void setRows(List<List<Key>> newRows, boolean isSymbols) {
+    public void setRows(List<List<Key>> newRows, boolean isSymbols, Lang language) {
         cancelAllPresses();
         rows = newRows;
         symbols = isSymbols;
+        lang = language;
         layoutKeys(getWidth());
         requestLayout();
         invalidate();
@@ -220,12 +243,35 @@ public class KlaviaturaView extends View {
         invalidate();
     }
 
+    public void setModeLabel(String label) {
+        modeLabel = label;
+        invalidate();
+    }
+
+    public void setSuggestions(List<String> list) {
+        suggestions = list == null ? new ArrayList<>() : new ArrayList<>(list);
+        invalidate();
+    }
+
+    public void setStripVisible(boolean visible) {
+        if (stripVisible != visible) {
+            stripVisible = visible;
+            layoutKeys(getWidth());
+            requestLayout();
+            invalidate();
+        }
+    }
+
+    private float keysTop() {
+        return (stripVisible ? stripHeight : 0) + topPad;
+    }
+
     // ---- Ölçov va joylaşuv ----
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int w = MeasureSpec.getSize(widthMeasureSpec);
-        int h = (int) Math.ceil(topPad + bottomPad + rowHeight * Math.max(1, rows.size()));
+        int h = (int) Math.ceil(keysTop() + bottomPad + rowHeight * Math.max(1, rows.size()));
         setMeasuredDimension(w, h);
     }
 
@@ -237,13 +283,17 @@ public class KlaviaturaView extends View {
 
     private void layoutKeys(int width) {
         if (width <= 0 || rows.isEmpty()) return;
+        float slot = width / (float) suggestionKeys.length;
+        for (int i = 0; i < suggestionKeys.length; i++) {
+            suggestionKeys[i].rect.set(i * slot, 0, (i + 1) * slot, stripVisible ? stripHeight : 0);
+        }
         float maxUnits = 0;
         for (List<Key> row : rows) maxUnits = Math.max(maxUnits, units(row));
         float unit = (width - 2 * sidePad) / maxUnits;
         for (int i = 0; i < rows.size(); i++) {
             List<Key> row = rows.get(i);
             float x = sidePad + (maxUnits - units(row)) * unit / 2f;
-            float top = topPad + i * rowHeight;
+            float top = keysTop() + i * rowHeight;
             for (Key k : row) {
                 k.rect.set(x, top, x + k.width * unit, top + rowHeight);
                 x = k.rect.right;
@@ -259,7 +309,12 @@ public class KlaviaturaView extends View {
 
     private Key findKey(float x, float y) {
         if (rows.isEmpty()) return null;
-        int ri = (int) Math.floor((y - topPad) / rowHeight);
+        if (stripVisible && y < stripHeight) {
+            int si = (int) (x / (getWidth() / (float) suggestionKeys.length));
+            si = Math.max(0, Math.min(suggestionKeys.length - 1, si));
+            return si < suggestions.size() ? suggestionKeys[si] : null;
+        }
+        int ri = (int) Math.floor((y - keysTop()) / rowHeight);
         ri = Math.max(0, Math.min(rows.size() - 1, ri));
         Key best = null;
         float bestD = Float.MAX_VALUE;
@@ -279,8 +334,37 @@ public class KlaviaturaView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         canvas.drawColor(c.background);
+        if (stripVisible) drawStrip(canvas);
         for (List<Key> row : rows) {
             for (Key k : row) drawKey(canvas, k, isPressed(k));
+        }
+    }
+
+    private void drawStrip(Canvas canvas) {
+        stripPaint.setColor(c.hint);
+        for (int i = 0; i < suggestionKeys.length; i++) {
+            Key k = suggestionKeys[i];
+            if (i > 0 && i < suggestions.size()) {
+                float x = k.rect.left;
+                canvas.drawLine(x, stripHeight * 0.28f, x, stripHeight * 0.72f, stripPaint);
+            }
+            if (i >= suggestions.size()) continue;
+            if (isPressed(k)) {
+                keyPaint.setColor(c.pressed);
+                canvas.drawRect(k.rect, keyPaint);
+            }
+            drawRect.set(k.rect);
+            String s = suggestions.get(i);
+            textPaint.setTypeface(i == 0 ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+            float size = suggestionSize;
+            textPaint.setTextSize(size);
+            float max = k.rect.width() - hintInset * 2;
+            while (size > suggestionSize * 0.6f && textPaint.measureText(s) > max) {
+                size -= 1f;
+                textPaint.setTextSize(size);
+            }
+            drawText(canvas, s, size, c.text);
+            textPaint.setTypeface(Typeface.DEFAULT);
         }
     }
 
@@ -296,7 +380,7 @@ public class KlaviaturaView extends View {
                 k.rect.right - gapH / 2f, k.rect.bottom - gapV / 2f);
 
         boolean accent = k.type == Key.ENTER || (k.type == Key.SHIFT && shiftState == SHIFT_LOCK);
-        boolean special = k.type != Key.CHAR && k.type != Key.SPACE;
+        boolean special = k.type != Key.CHAR && k.type != Key.SPACE && k.type != Key.T9;
         int bg;
         if (accent) bg = pressed ? c.accentPressed : c.accent;
         else if (special) bg = pressed ? c.specialPressed : c.specialKey;
@@ -312,7 +396,7 @@ public class KlaviaturaView extends View {
         switch (k.type) {
             case Key.CHAR: {
                 String label = (!symbols && shiftState != SHIFT_OFF)
-                        ? k.text.toUpperCase(Locale.ROOT) : k.text;
+                        ? upper(k.text) : k.text;
                 drawText(canvas, label, letterSize, fg);
                 if (k.alt != null) {
                     canvas.drawText(k.alt, drawRect.right - hintInset,
@@ -353,10 +437,35 @@ public class KlaviaturaView extends View {
             case Key.SPACE:
                 if (!symbols) drawText(canvas, spaceLabel, spaceSize, c.hint);
                 break;
+            case Key.LANG:
+                iconPaint.setStyle(Paint.Style.STROKE);
+                iconPaint.setColor(fg);
+                drawIcon(canvas, globePath);
+                break;
+            case Key.T9MODE:
+                drawText(canvas, modeLabel, specialSize, fg);
+                break;
+            case Key.T9: {
+                float cx = drawRect.centerX();
+                textPaint.setTextSize(t9DigitSize);
+                textPaint.setColor(fg);
+                Paint.FontMetrics fm = textPaint.getFontMetrics();
+                float digitBase = drawRect.centerY() - dp(getResources().getDisplayMetrics(), 1);
+                canvas.drawText(k.text, cx, digitBase, textPaint);
+                textPaint.setTextSize(t9LettersSize);
+                textPaint.setColor(c.hint);
+                String letters = shiftState != SHIFT_OFF ? upper(k.alt) : k.alt;
+                canvas.drawText(letters, cx, digitBase - fm.ascent * 0.75f, textPaint);
+                break;
+            }
             default:
                 drawText(canvas, k.text, specialSize, fg);
                 break;
         }
+    }
+
+    private String upper(String s) {
+        return lang != null ? lang.upper(s) : s.toUpperCase(Locale.ROOT);
     }
 
     private void drawText(Canvas canvas, String s, float size, int color) {
@@ -391,7 +500,7 @@ public class KlaviaturaView extends View {
                 for (int i = 0; i < presses.size(); i++) {
                     Press o = presses.valueAt(i);
                     if (!o.consumed && (o.key.type == Key.CHAR || o.key.type == Key.SPACE
-                            || o.key.type == Key.SHIFT)) {
+                            || o.key.type == Key.SHIFT || o.key.type == Key.T9)) {
                         handler.removeCallbacks(o);
                         o.consumed = true;
                         if (listener != null) listener.onKeyTap(o.key);

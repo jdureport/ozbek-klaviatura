@@ -11,16 +11,26 @@ public final class Key {
     public static final int TO_LETTERS = 4;
     public static final int SPACE = 5;
     public static final int ENTER = 6;
+    /** Tilni almaştiriş (🌐). */
+    public static final int LANG = 7;
+    /** T9 raqam tugmasi: text — raqam, alt — harflar. */
+    public static final int T9 = 8;
+    /** T9 rejimini almaştiriş (T9 ↔ abc). */
+    public static final int T9MODE = 9;
+    /** Takliflar qatoridagi katak. */
+    public static final int SUGGESTION = 10;
 
     public final int type;
     /** Tugmada körinadigan va yoziladigan matn. */
     public final String text;
-    /** Bosib turilganda yoziladigan belgi (bölmasa null). */
+    /** Bosib turilganda yoziladigan belgi (T9 da — harflar), bölmasa null. */
     public final String alt;
     /** Nisbiy kenglik (1 = oddiy harf tugmasi). */
     public final float width;
     /** Tugma egallagan katak (bosiş uçun), KlaviaturaView hisoblaydi. */
     public final RectF rect = new RectF();
+    /** Takliflar katagining tartib raqami. */
+    public int index;
 
     public Key(int type, String text, String alt, float width) {
         this.type = type;
@@ -43,5 +53,9 @@ public final class Key {
 
     static Key special(int type, String text, float width) {
         return new Key(type, text, null, width);
+    }
+
+    static Key t9(String digit, String letters) {
+        return new Key(T9, digit, letters, 1f);
     }
 }

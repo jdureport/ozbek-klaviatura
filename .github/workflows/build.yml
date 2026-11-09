@@ -21,23 +21,42 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.9'
+          gradle-version: '8.11.1'
 
-      - name: APK yiğiş
-        run: gradle :app:assembleRelease --no-daemon -PversionCode=${{ github.run_number }}
+      - name: Yuklaş kalitini tayyorlaş
+        env:
+          UPLOAD_KEYSTORE_B64: ${{ secrets.UPLOAD_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$UPLOAD_KEYSTORE_B64" ]; then
+            echo "$UPLOAD_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.p12"
+            echo "UPLOAD_KEYSTORE_FILE=$RUNNER_TEMP/upload.p12" >> "$GITHUB_ENV"
+          fi
 
-      - name: Faylni nomlaş
-        run: cp app/build/outputs/apk/release/app-release.apk ozbek-klaviatura.apk
+      - name: APK va AAB yiğiş
+        env:
+          UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.UPLOAD_KEYSTORE_PASSWORD }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
+          UPLOAD_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
+        run: gradle :app:assembleRelease :app:bundlePlay --no-daemon -PversionCode=${{ github.run_number }}
+
+      - name: Fayllarni nomlaş
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk ozbek-klaviatura.apk
+          cp app/build/outputs/bundle/play/app-play.aab ozbek-klaviatura-play.aab
 
       - uses: actions/upload-artifact@v4
         with:
           name: ozbek-klaviatura
-          path: ozbek-klaviatura.apk
+          path: |
+            ozbek-klaviatura.apk
+            ozbek-klaviatura-play.aab
 
       - name: Reliz çiqariş
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.1.${{ github.run_number }}
-          name: Özbek klaviatura 0.1.${{ github.run_number }}
-          files: ozbek-klaviatura.apk
+          tag_name: v0.2.${{ github.run_number }}
+          name: Özbek klaviatura 0.2.${{ github.run_number }}
+          files: |
+            ozbek-klaviatura.apk
+            ozbek-klaviatura-play.aab
           make_latest: true
