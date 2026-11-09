@@ -1,0 +1,42 @@
+plugins {
+    id 'com.android.application'
+}
+
+def buildNumber = (project.findProperty('versionCode') ?: '1').toString().toInteger()
+
+android {
+    namespace = 'uz.yangialifbo.klaviatura'
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = 'uz.yangialifbo.klaviatura'
+        minSdk = 26
+        targetSdk = 34
+        versionCode = buildNumber
+        versionName = "0.1.${buildNumber}"
+    }
+
+    signingConfigs {
+        shared {
+            storeFile = file('../keystore/klaviatura.jks')
+            storePassword = 'yangialifbo'
+            keyAlias = 'klaviatura'
+            keyPassword = 'yangialifbo'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = false
+            signingConfig = signingConfigs.shared
+        }
+        debug {
+            signingConfig = signingConfigs.shared
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
