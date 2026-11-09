@@ -15,8 +15,8 @@ final class Theme {
     static final String[] PRESET_NAMES = {"Avtomatik", "Yoruğ", "Qorönği", "Tun", "Anor", "Osmon", "Lola", "Qum"};
     private static final int[][] PRESET_COLORS = {
             null,
-            {0xFFE6E8EC, 0xFFFFFFFF, 0xFF1A1C20, 0xFF0E7C86},
-            {0xFF17181B, 0xFF33353A, 0xFFF1F2F4, 0xFF23A3AE},
+            {0xFFEDEFF2, 0xFFFFFFFF, 0xFF1A1C20, 0xFF0E7C86},
+            {0xFF141518, 0xFF2B2D31, 0xFFECEDEF, 0xFF23A3AE},
             {0xFF000000, 0xFF1C1C1E, 0xFFFFFFFF, 0xFF23A3AE},
             {0xFFF6E9EA, 0xFFFFFFFF, 0xFF2A1215, 0xFFB3263E},
             {0xFFE3ECF7, 0xFFFFFFFF, 0xFF13233A, 0xFF1F6FEB},
@@ -42,11 +42,11 @@ final class Theme {
         this.text = text;
         this.accent = accent;
         boolean light = luminance(background) > 0.4;
-        specialKey = mix(background, text, light ? 0.13f : 0.10f);
-        pressed = mix(key, text, 0.12f);
-        specialPressed = mix(specialKey, text, 0.14f);
+        specialKey = mix(background, text, light ? 0.09f : 0.08f);
+        pressed = mix(key, text, 0.10f);
+        specialPressed = mix(specialKey, text, 0.12f);
         shadow = mix(background, 0xFF000000, light ? 0.25f : 0.55f);
-        hint = mix(text, key, 0.45f);
+        hint = mix(text, key, 0.52f);
         accentPressed = mix(accent, 0xFF000000, 0.18f);
         onAccent = luminance(accent) > 0.55 ? 0xFF111214 : 0xFFFFFFFF;
     }

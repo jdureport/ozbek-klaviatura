@@ -124,7 +124,7 @@ public class KlaviaturaView extends View {
         hintPaint.setTextAlign(Paint.Align.RIGHT);
         hintPaint.setTextSize(hintSize);
         hintPaint.setColor(c.hint);
-        iconPaint.setStrokeWidth(dp(dm, 1.8f));
+        iconPaint.setStrokeWidth(dp(dm, 1.6f));
         iconPaint.setStrokeJoin(Paint.Join.ROUND);
         iconPaint.setStrokeCap(Paint.Cap.ROUND);
 
@@ -198,15 +198,15 @@ public class KlaviaturaView extends View {
         topPad = dp(dm, 4);
         bottomPad = dp(dm, 6 + Prefs.extraBottom(getContext()));
         gapH = dp(dm, 6);
-        gapV = dp(dm, 10 * Math.min(1.1f, scale));
-        radius = dp(dm, 8);
-        shadowDy = dp(dm, 1f);
-        letterSize = sp(dm, 22);
-        specialSize = sp(dm, 15);
+        gapV = dp(dm, 9 * Math.min(1.1f, scale));
+        radius = dp(dm, 10);
+        shadowDy = 0;
+        letterSize = sp(dm, 21);
+        specialSize = sp(dm, 14);
         spaceSize = sp(dm, 13);
-        hintSize = sp(dm, 10);
-        iconSize = dp(dm, 22);
-        hintInset = dp(dm, 5);
+        hintSize = sp(dm, 9);
+        iconSize = dp(dm, 20);
+        hintInset = dp(dm, 3.5f);
         stripHeight = dp(dm, 44);
         suggestionSize = sp(dm, 16);
         t9DigitSize = sp(dm, 22);
@@ -436,9 +436,9 @@ public class KlaviaturaView extends View {
         float bottom = k.rect.top + gapV / 2f + (k.rect.height() - gapV) * 0.35f;
         float top = Math.max(0, bottom - h);
         bubble.set(left, top, left + w, bottom);
-        keyPaint.setColor(c.shadow);
-        canvas.drawRoundRect(bubble.left, bubble.top + shadowDy * 2, bubble.right,
-                bubble.bottom + shadowDy * 2, radius * 1.5f, radius * 1.5f, keyPaint);
+        keyPaint.setColor(Theme.mix(c.background, 0xFF000000, 0.18f));
+        canvas.drawRoundRect(bubble.left, bubble.top + 2, bubble.right,
+                bubble.bottom + 3, radius * 1.5f, radius * 1.5f, keyPaint);
         keyPaint.setColor(c.key);
         canvas.drawRoundRect(bubble, radius * 1.5f, radius * 1.5f, keyPaint);
         String label = (!symbols && shiftState != SHIFT_OFF) ? upper(k.text) : k.text;
@@ -525,16 +525,18 @@ public class KlaviaturaView extends View {
         boolean layer = k.type == Key.TO_SYMBOLS || k.type == Key.TO_LETTERS;
         int bg;
         if (accent) bg = pressed ? c.accentPressed : c.accent;
-        else if (layer) bg = Theme.mix(pressed ? c.specialPressed : c.specialKey, c.accent, 0.22f);
+        else if (layer) bg = Theme.mix(pressed ? c.specialPressed : c.specialKey, c.accent, 0.16f);
         else if (special) bg = pressed ? c.specialPressed : c.specialKey;
         else bg = pressed ? c.pressed : c.key;
         int fg = accent ? c.onAccent : c.text;
         // Gboard kabi: ?123 va ↵ — dumaloq (pill) şaklda
         float r = (k.type == Key.ENTER || layer) && !t9Like(k) ? drawRect.height() / 2f : radius;
 
-        keyPaint.setColor(c.shadow);
-        canvas.drawRoundRect(drawRect.left, drawRect.top + shadowDy, drawRect.right,
-                drawRect.bottom + shadowDy, r, r, keyPaint);
+        if (shadowDy > 0) {
+            keyPaint.setColor(c.shadow);
+            canvas.drawRoundRect(drawRect.left, drawRect.top + shadowDy, drawRect.right,
+                    drawRect.bottom + shadowDy, r, r, keyPaint);
+        }
         keyPaint.setColor(bg);
         canvas.drawRoundRect(drawRect, r, r, keyPaint);
 
@@ -542,10 +544,16 @@ public class KlaviaturaView extends View {
             case Key.CHAR: {
                 String label = (!symbols && shiftState != SHIFT_OFF)
                         ? upper(k.text) : k.text;
+                // Burçakdagi belgi bölsa — harf biroz pastroqda, belgi kiçik va burçakda:
+                // ular bir-biriga tegmaydi.
+                float shiftDown = k.alt != null ? hintSize * 0.35f : 0f;
+                drawRect.offset(0, shiftDown);
                 drawText(canvas, label, letterSize, fg);
+                drawRect.offset(0, -shiftDown);
                 if (k.alt != null) {
+                    Paint.FontMetrics hm = hintPaint.getFontMetrics();
                     canvas.drawText(k.alt, drawRect.right - hintInset,
-                            drawRect.top + hintInset + hintSize * 0.8f, hintPaint);
+                            drawRect.top + hintInset - hm.ascent * 0.92f, hintPaint);
                 }
                 break;
             }

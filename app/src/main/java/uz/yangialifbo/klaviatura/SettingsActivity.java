@@ -182,9 +182,9 @@ public class SettingsActivity extends Activity {
                     }
                 }));
         about.addView(ui.divider());
-        about.addView(ui.row("Luğatlar",
-                "Özbekça — kaharjan/uzb-frequent-words (GPL-3.0); qoraqalpoqça — shagalalab/sozlik (MIT); "
-                        + "inglizça va rusça — hermitdave/FrequencyWords (CC BY-SA 4.0)", null, null));
+        about.addView(ui.row("Luğatlar va litsenziyalar",
+                "Özbekça — öz röyxatimiz, CC0 korpus, MIT va Apache lemmalari; qoraqalpoqça — MIT; "
+                        + "inglizça va rusça — CC BY-SA 4.0", ui.chevron(), v -> showLicenses()));
         col.addView(about);
 
         refreshTheme();
@@ -289,6 +289,29 @@ public class SettingsActivity extends Activity {
                     refreshTheme();
                 })
                 .setNegativeButton("Bekor qiliş", null)
+                .show();
+    }
+
+    private void showLicenses() {
+        String text;
+        try (java.io.InputStream in = getAssets().open("LICENSES.txt")) {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            text = out.toString("UTF-8");
+        } catch (Exception e) {
+            text = "Litsenziyalar fayli topilmadi.";
+        }
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        TextView t = ui.text(text, 13, ui.text, false);
+        t.setTextIsSelectable(true);
+        t.setPadding(ui.px(22), ui.px(12), ui.px(22), ui.px(12));
+        sv.addView(t);
+        new AlertDialog.Builder(this)
+                .setTitle("Luğatlar va litsenziyalar")
+                .setView(sv)
+                .setPositiveButton("Yopiş", null)
                 .show();
     }
 

@@ -1,0 +1,70 @@
+LUĞATLAR VA ULARNING LITSENZIYALARI
+
+Özbekça luğat (assets/dict/uz.txt) quyidagilardan tuzilgan va 2026-yilgi lotin alifbosiga öğirilgan:
+1. Köp işlatiladigan sözlarning qöl bilan tuzilgan röyxati — Özbek klaviatura loyihasi.
+2. Söz şakllari çastotasi — "Uzbek legal corpus", Javokhir Matniyozov
+   https://github.com/javohirmat/uzbek-legal-corpus — CC0 1.0 (jamoat mulki).
+3. Lemmalar — "UzbekLemma", Sobirov Og‘abek
+   https://github.com/ddasturbek/UzbekLemma — MIT litsenziyasi (matni quyida).
+4. Lemmalar va negizlar — "UzbekLemmaStems-POS-Dataset", Maksud Sharipov
+   https://github.com/MaksudSharipov/UzbekLemmaStems-POS-Dataset — Apache License 2.0
+   (https://www.apache.org/licenses/LICENSE-2.0). Maʼlumotlar söz röyxatiga aylantirilgan va alifbosi özgartirilgan.
+
+Qoraqalpoqça luğat (assets/dict/kaa.txt) — "Sozlik", Shag'ala Lab
+   https://github.com/shagalalab/sozlik-android — MIT litsenziyasi (matni quyida).
+   Sarlavha sözlari ajratib olingan va 2016-yilgi lotin alifbosiga öğirilgan.
+
+Inglizça va rusça luğatlar (assets/dict/en.txt, ru.txt) — "FrequencyWords", Hermit Dave
+   https://github.com/hermitdave/FrequencyWords — CC BY-SA 4.0
+   (https://creativecommons.org/licenses/by-sa/4.0/). Röyxatlar qisqartirilgan va süzilgan;
+   özgartirilgan röyxatlar ham CC BY-SA 4.0 şartlarida tarqatiladi.
+
+----------------------------------------------------------------
+UzbekLemma:
+
+MIT License
+
+Copyright (c) 2024 Sobirov Og‘abek
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+----------------------------------------------------------------
+Sozlik (shagalalab):
+
+MIT License
+
+Copyright (c) 2018 Shag'ala Lab
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

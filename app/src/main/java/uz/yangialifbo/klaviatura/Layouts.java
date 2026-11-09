@@ -203,20 +203,21 @@ final class Layouts {
         r2.add(Key.special(Key.DELETE, "", 2f));
         rows.add(r2);
         List<Key> bottom = bottomRow(abcLabel, 11);
-        bottom.set(0, Key.special(Key.TO_LETTERS, abcLabel, 1.25f));
+        bottom.set(0, Key.special(Key.TO_LETTERS, abcLabel, 1.5f));
         rows.add(bottom);
         return rows;
     }
 
-    /** Pastki qator: 123  😊  ,  [◂ til ▸]  .  ↵ */
+    /** Pastki qator ikki tomondan teng: 123  😊  ,  [◂ til ▸]  .  ?  ↵ (123 va ↵ — bir xil). */
     private static List<Key> bottomRow(String layerLabel, float total) {
         return row(
-                Key.special(Key.TO_SYMBOLS, layerLabel, 1.25f),
+                Key.special(Key.TO_SYMBOLS, layerLabel, 1.5f),
                 Key.special(Key.EMOJI_KEY, "", 1f),
                 Key.ch(",", "-"),
-                Key.special(Key.SPACE, " ", total - 6.25f),
-                Key.ch(".", "?"),
-                Key.special(Key.ENTER, "", 2f));
+                Key.special(Key.SPACE, " ", total - 7f),
+                Key.ch(".", "…"),
+                Key.ch("?", "!"),
+                Key.special(Key.ENTER, "", 1.5f));
     }
 
     private static List<Key> row(Key... keys) {

@@ -35,7 +35,7 @@ Har bir özgarişdan keyin GitHub Actions APK'ni avtomatik yiğadi. Tayyor fayln
 
 ## Luğatlar
 
-- Özbekça: [kaharjan/uzb-frequent-words](https://github.com/kaharjan/uzb-frequent-words) (GPL-3.0), yangi alifboga öğirilgan
+- Özbekça: öz röyxatimiz + [javohirmat/uzbek-legal-corpus](https://github.com/javohirmat/uzbek-legal-corpus) (CC0) + [ddasturbek/UzbekLemma](https://github.com/ddasturbek/UzbekLemma) (MIT) + [MaksudSharipov/UzbekLemmaStems-POS-Dataset](https://github.com/MaksudSharipov/UzbekLemmaStems-POS-Dataset) (Apache-2.0), yangi alifboga öğirilgan
 - Qoraqalpoqça: [shagalalab/sozlik-android](https://github.com/shagalalab/sozlik-android) (MIT), 2016-yilgi lotin alifbosiga öğirilgan
 - Inglizça, rusça: [hermitdave/FrequencyWords](https://github.com/hermitdave/FrequencyWords) (CC BY-SA 4.0)
 
