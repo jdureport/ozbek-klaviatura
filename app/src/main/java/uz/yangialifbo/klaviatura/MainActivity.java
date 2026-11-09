@@ -52,6 +52,37 @@ public class MainActivity extends Activity {
         hero.addView(ht);
         col.addView(hero);
 
+        // ---- Oxirgi xato (bölsa) ----
+        String crash = App.read(this);
+        if (crash != null) {
+            LinearLayout err = ui.card();
+            err.setPadding(ui.px(18), ui.px(14), ui.px(18), ui.px(16));
+            err.addView(ui.text("Oxirgi xato haqida maʼlumot", 16, 0xFFD9480F, true));
+            TextView et = ui.text(crash.length() > 1500 ? crash.substring(0, 1500) + "…" : crash,
+                    12, ui.muted, false);
+            et.setTextIsSelectable(true);
+            et.setPadding(0, ui.px(6), 0, ui.px(10));
+            err.addView(et);
+            LinearLayout btns = new LinearLayout(this);
+            btns.addView(ui.tonalButton("Nusxalaş", v -> {
+                android.content.ClipboardManager cm =
+                        (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("xato", crash));
+                android.widget.Toast.makeText(this, "Nusxalandi", android.widget.Toast.LENGTH_SHORT).show();
+            }));
+            TextView dismiss = ui.tonalButton("Yopiş", v -> {
+                App.clear(this);
+                err.setVisibility(View.GONE);
+            });
+            LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            dl.leftMargin = ui.px(10);
+            btns.addView(dismiss, dl);
+            err.addView(btns);
+            col.addView(err, ui.matchWrap(0));
+            col.addView(new View(this), new LinearLayout.LayoutParams(1, ui.px(12)));
+        }
+
         // ---- Holat ----
         LinearLayout status = ui.card();
         LinearLayout srow = new LinearLayout(this);

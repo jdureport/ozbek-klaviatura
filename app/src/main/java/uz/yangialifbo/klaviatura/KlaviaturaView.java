@@ -305,7 +305,7 @@ public class KlaviaturaView extends View {
     public WindowInsets onApplyWindowInsets(WindowInsets insets) {
         // Android 15 (API 35) dan boşlab klaviatura oynasi navigatsiya paneli ostigaça çiziladi.
         int bottom = 0;
-        if (Build.VERSION.SDK_INT >= 35) {
+        if (Build.VERSION.SDK_INT >= 35 && getContext() instanceof android.inputmethodservice.InputMethodService) {
             // navigationBars — tizim paneli; tappableElement — klaviatura oçiqligida
             // çiqadigan ∨ (yopiş) va 🌐 (klaviaturani almaştiriş) tugmalari.
             bottom = Math.max(insets.getInsets(WindowInsets.Type.navigationBars()).bottom,

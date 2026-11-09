@@ -32,6 +32,28 @@ public class SettingsActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        try {
+            build();
+        } catch (Throwable e) {
+            App.save(this, e);
+            showError(e);
+        }
+    }
+
+    /** Ekranni qura olmasak — xatoni körsatamiz (nusxalab yuboriş uçun). */
+    private void showError(Throwable e) {
+        java.io.StringWriter sw = new java.io.StringWriter();
+        e.printStackTrace(new java.io.PrintWriter(sw));
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        TextView t = new TextView(this);
+        t.setTextIsSelectable(true);
+        t.setPadding(40, 120, 40, 40);
+        t.setText("Sozlamalarni oçişda xato yuz berdi. Bu matnni nusxalab dasturçiga yuboring:\n\n" + sw);
+        sv.addView(t);
+        setContentView(sv);
+    }
+
+    private void build() {
         ui = new Ui(this);
         LinearLayout col = ui.screen();
         col.addView(ui.title("Sozlamalar", this::finish));
