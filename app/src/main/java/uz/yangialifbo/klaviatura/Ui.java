@@ -54,19 +54,6 @@ final class Ui {
 
     /** Butun ekran: fon, tizim panellari uçun çetdan joy, aylantiriladigan ustun. */
     LinearLayout screen() {
-        Window w = a.getWindow();
-        w.setStatusBarColor(Color.TRANSPARENT);
-        w.setNavigationBarColor(bg);
-        if (Build.VERSION.SDK_INT >= 30) {
-            WindowInsetsController c = w.getInsetsController();
-            if (c != null) {
-                int light = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
-                        | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
-                c.setSystemBarsAppearance(night ? 0 : light, light);
-            }
-        } else if (!night) {
-            w.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        }
         ScrollView scroll = new ScrollView(a);
         scroll.setBackgroundColor(bg);
         scroll.setClipToPadding(false);
@@ -90,6 +77,20 @@ final class Ui {
             return insets;
         });
         a.setContentView(scroll);
+        // Tizim panellari ranglari — setContentView dan keyin (DecorView yaratilgandan söng).
+        Window w = a.getWindow();
+        w.setStatusBarColor(Color.TRANSPARENT);
+        w.setNavigationBarColor(bg);
+        if (Build.VERSION.SDK_INT >= 30) {
+            WindowInsetsController c = w.getInsetsController();
+            if (c != null) {
+                int light = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                        | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+                c.setSystemBarsAppearance(night ? 0 : light, light);
+            }
+        } else if (!night) {
+            w.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        }
         return col;
     }
 
