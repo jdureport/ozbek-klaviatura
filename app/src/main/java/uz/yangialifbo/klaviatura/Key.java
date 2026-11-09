@@ -41,6 +41,8 @@ public final class Key {
     public final RectF rect = new RectF();
     /** Takliflar katagining tartib raqami. */
     public int index;
+    /** Raqamlar qatori tugmasi (pastroq qator). */
+    public boolean small;
 
     public Key(int type, String text, String alt, float width) {
         this.type = type;

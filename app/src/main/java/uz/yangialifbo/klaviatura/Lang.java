@@ -53,17 +53,17 @@ final class Lang {
                 return new Lang(UZ_T9, "Özbek T9", "Özbekça T9 (12 tugma)", "T9", "uz", true, Layouts.uzT9());
             case KAA:
                 return new Lang(KAA, "Qaraqalpaqsha", "Qoraqalpoqça", "ABD", "kaa", false,
-                        Layouts.letters(KAA, Prefs.layoutRows(c, KAA)));
+                        Layouts.letters(KAA, Prefs.layoutRows(c, KAA), Prefs.numberRow(c)));
             case EN:
                 return new Lang(EN, "English", "Inglizça", "ABC", "en", false,
-                        Layouts.letters(EN, Prefs.layoutRows(c, EN)));
+                        Layouts.letters(EN, Prefs.layoutRows(c, EN), Prefs.numberRow(c)));
             case RU:
                 return new Lang(RU, "Русский", "Rusça", "АБВ", "ru", false,
-                        Layouts.letters(RU, Prefs.layoutRows(c, RU)));
+                        Layouts.letters(RU, Prefs.layoutRows(c, RU), Prefs.numberRow(c)));
             case UZ:
             default:
                 return new Lang(UZ, "Özbek", "Özbekça", "ABD", "uz", false,
-                        Layouts.letters(UZ, Prefs.layoutRows(c, UZ)));
+                        Layouts.letters(UZ, Prefs.layoutRows(c, UZ), Prefs.numberRow(c)));
         }
     }
 

@@ -133,4 +133,14 @@ final class Prefs {
         get(c).edit().putBoolean("harf_korinishi", on).apply();
         bumpVersion(c);
     }
+
+    /** Harflar ustida alohida raqamlar qatori (Gboard kabi). */
+    static boolean numberRow(Context c) {
+        return get(c).getBoolean("raqamlar_qatori", true);
+    }
+
+    static void setNumberRow(Context c, boolean on) {
+        get(c).edit().putBoolean("raqamlar_qatori", on).apply();
+        bumpVersion(c);
+    }
 }

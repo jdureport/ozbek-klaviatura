@@ -283,7 +283,7 @@ public class KlaviaturaView extends View {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int w = MeasureSpec.getSize(widthMeasureSpec);
-        int h = (int) Math.ceil(keysTop() + bottomPad + rowHeight * Math.max(1, rows.size())) + navInset;
+        int h = (int) Math.ceil(keysTop() + bottomPad + keysHeight()) + navInset;
         setMeasuredDimension(w, h);
     }
 
@@ -332,12 +332,28 @@ public class KlaviaturaView extends View {
         for (int i = 0; i < rows.size(); i++) {
             List<Key> row = rows.get(i);
             float x = sidePad + (maxUnits - units(row)) * unit / 2f;
-            float top = keysTop() + i * rowHeight;
+            float top = keysTop() + rowTop(i);
             for (Key k : row) {
-                k.rect.set(x, top, x + k.width * unit, top + rowHeight);
+                k.rect.set(x, top, x + k.width * unit, top + rowH(row));
                 x = k.rect.right;
             }
         }
+    }
+
+    /** Qator balandligi: raqamlar qatori pastroq. */
+    private float rowH(List<Key> row) {
+        return !row.isEmpty() && row.get(0).small ? rowHeight * 0.8f : rowHeight;
+    }
+
+    private float rowTop(int index) {
+        float t = 0;
+        for (int i = 0; i < index; i++) t += rowH(rows.get(i));
+        return t;
+    }
+
+    private float keysHeight() {
+        if (rows.isEmpty()) return rowHeight;
+        return rowTop(rows.size());
     }
 
     private static float units(List<Key> row) {
@@ -357,8 +373,13 @@ public class KlaviaturaView extends View {
             }
             return si < suggestions.size() ? suggestionKeys[si] : null;
         }
-        int ri = (int) Math.floor((y - keysTop()) / rowHeight);
-        ri = Math.max(0, Math.min(rows.size() - 1, ri));
+        int ri = rows.size() - 1;
+        for (int i = 0; i < rows.size(); i++) {
+            if (y < keysTop() + rowTop(i) + rowH(rows.get(i))) {
+                ri = i;
+                break;
+            }
+        }
         Key best = null;
         float bestD = Float.MAX_VALUE;
         for (Key k : rows.get(ri)) {
@@ -474,17 +495,21 @@ public class KlaviaturaView extends View {
         boolean accent = k.type == Key.ENTER || (k.type == Key.SHIFT && shiftState == SHIFT_LOCK);
         boolean special = k.type != Key.CHAR && k.type != Key.SPACE && k.type != Key.T9
                 && k.type != Key.CLIP;
+        boolean layer = k.type == Key.TO_SYMBOLS || k.type == Key.TO_LETTERS;
         int bg;
         if (accent) bg = pressed ? c.accentPressed : c.accent;
+        else if (layer) bg = Theme.mix(pressed ? c.specialPressed : c.specialKey, c.accent, 0.22f);
         else if (special) bg = pressed ? c.specialPressed : c.specialKey;
         else bg = pressed ? c.pressed : c.key;
         int fg = accent ? c.onAccent : c.text;
+        // Gboard kabi: ?123 va ↵ — dumaloq (pill) şaklda
+        float r = (k.type == Key.ENTER || layer) && !t9Like(k) ? drawRect.height() / 2f : radius;
 
         keyPaint.setColor(c.shadow);
         canvas.drawRoundRect(drawRect.left, drawRect.top + shadowDy, drawRect.right,
-                drawRect.bottom + shadowDy, radius, radius, keyPaint);
+                drawRect.bottom + shadowDy, r, r, keyPaint);
         keyPaint.setColor(bg);
-        canvas.drawRoundRect(drawRect, radius, radius, keyPaint);
+        canvas.drawRoundRect(drawRect, r, r, keyPaint);
 
         switch (k.type) {
             case Key.CHAR: {
@@ -572,6 +597,11 @@ public class KlaviaturaView extends View {
                 drawText(canvas, k.text, specialSize, fg);
                 break;
         }
+    }
+
+    /** T9 va raqamli klaviaturadagi katta tugmalar uçun pill şakl kerak emas. */
+    private boolean t9Like(Key k) {
+        return k.rect.width() > k.rect.height() * 1.6f && k.type != Key.ENTER;
     }
 
     private String upper(String s) {

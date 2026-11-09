@@ -191,6 +191,17 @@ public class MainActivity extends Activity {
             bottomRow.addView(b, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         }
         col.addView(bottomRow);
+        CheckBox nr = new CheckBox(this);
+        nr.setText("Harflar ustida raqamlar qatori");
+        nr.setTextColor(textColor);
+        nr.setTextSize(16);
+        nr.setChecked(Prefs.numberRow(this));
+        nr.setOnCheckedChangeListener((b, on) -> {
+            Prefs.setNumberRow(this, on);
+            Lang uz = Lang.create(this, Lang.UZ);
+            preview.setRows(uz.letters, false, uz);
+        });
+        col.addView(nr);
         CheckBox pv = new CheckBox(this);
         pv.setText("Bosilgan harfni kattalaştirib körsatiş");
         pv.setTextColor(textColor);

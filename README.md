@@ -28,6 +28,7 @@ Har bir özgarişdan keyin GitHub Actions APK'ni avtomatik yiğadi. Tayyor fayln
 - Harf joylarini özgartiriş (har bir til uçun)
 - Bufer paneli (📋) va sozlamalar tugmasi (⚙)
 - Balandlik (Ixçam / Oddiy / Baland), pastki böşliq, bosilgan harfni kattalaştirib körsatiş
+- Gboard uslubi: raqamlar qatori, harflar ustida belgilar, dumaloq ?123 va ↵
 
 ## Luğatlar
 

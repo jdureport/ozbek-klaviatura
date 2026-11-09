@@ -19,6 +19,14 @@ final class Layouts {
     static final String[] RU_ROWS = {"йцукенгшщзх", "фывапролджэ", "ячсмитьбю"};
 
     private static final String DIGITS = "1234567890";
+    /** Gboard kabi: harflarni bosib turganda çiqadigan belgilar (qator va örin böyiça). */
+    private static final String SYM0 = "%^~|[]<>{}";
+    private static final String SYM1 = "@#$_&-+()";
+    private static final String SYM2 = "*\"':;!?";
+
+    private static String symAt(String sym, int i) {
+        return i < sym.length() ? String.valueOf(sym.charAt(i)) : null;
+    }
 
     static String[] defaultRows(String langId) {
         switch (langId) {
@@ -56,23 +64,37 @@ final class Layouts {
      * Harf qatorlaridan töliq joylaşuv quriş:
      * 1-qatorda raqamlar (bosib turilsa), 3-qatorda ⇧ va ⌫, pastda umumiy qator.
      */
-    static List<List<Key>> letters(String langId, String[] rows) {
+    static List<List<Key>> letters(String langId, String[] rows, boolean numberRow) {
         float w = Lang.EN.equals(langId) ? 1.1f : 1f;
+        float total = Math.max(rows[0].length(), rows[1].length()) * w;
         List<List<Key>> out = new ArrayList<>();
+        if (numberRow) {
+            List<Key> nr = new ArrayList<>();
+            for (int i = 0; i < DIGITS.length(); i++) {
+                Key k = Key.ch(String.valueOf(DIGITS.charAt(i)), null, total / DIGITS.length());
+                k.small = true;
+                nr.add(k);
+            }
+            out.add(nr);
+        }
         List<Key> r0 = new ArrayList<>();
         for (int i = 0; i < rows[0].length(); i++) {
             char ch = rows[0].charAt(i);
-            String alt = i < DIGITS.length() ? String.valueOf(DIGITS.charAt(i)) : letterAlt(langId, ch);
+            String alt = letterAlt(langId, ch);
+            if (alt == null) {
+                alt = numberRow ? symAt(SYM0, i)
+                        : (i < DIGITS.length() ? String.valueOf(DIGITS.charAt(i)) : null);
+            }
             r0.add(Key.ch(String.valueOf(ch), alt, w));
         }
         out.add(r0);
         List<Key> r1 = new ArrayList<>();
         for (int i = 0; i < rows[1].length(); i++) {
             char ch = rows[1].charAt(i);
-            r1.add(Key.ch(String.valueOf(ch), letterAlt(langId, ch), w));
+            String alt = letterAlt(langId, ch);
+            r1.add(Key.ch(String.valueOf(ch), alt != null ? alt : symAt(SYM1, i), w));
         }
         out.add(r1);
-        float total = Math.max(rows[0].length(), rows[1].length()) * w;
         int n2 = rows[2].length();
         float side = (total - n2) / 2f;
         float lw = 1f;
@@ -84,7 +106,8 @@ final class Layouts {
         r2.add(Key.special(Key.SHIFT, "", side));
         for (int i = 0; i < n2; i++) {
             char ch = rows[2].charAt(i);
-            r2.add(Key.ch(String.valueOf(ch), letterAlt(langId, ch), lw));
+            String alt = letterAlt(langId, ch);
+            r2.add(Key.ch(String.valueOf(ch), alt != null ? alt : symAt(SYM2, i), lw));
         }
         r2.add(Key.special(Key.DELETE, "", side));
         out.add(r2);
