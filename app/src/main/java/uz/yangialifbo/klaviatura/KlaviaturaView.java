@@ -194,11 +194,12 @@ public class KlaviaturaView extends View {
                 == Configuration.ORIENTATION_LANDSCAPE;
         float scale = Prefs.heightScale(getContext());
         rowHeight = dp(dm, (landscape ? 44 : 54) * scale);
-        sidePad = dp(dm, 4);
+        float[] gap = Prefs.gapValues(getContext());
+        sidePad = dp(dm, gap[0] * 0.75f);
         topPad = dp(dm, 4);
         bottomPad = dp(dm, 6 + Prefs.extraBottom(getContext()));
-        gapH = dp(dm, 6);
-        gapV = dp(dm, 9 * Math.min(1.1f, scale));
+        gapH = dp(dm, gap[0]);
+        gapV = dp(dm, gap[1] * Math.min(1.1f, scale));
         radius = dp(dm, 10);
         shadowDy = 0;
         letterSize = sp(dm, 21);

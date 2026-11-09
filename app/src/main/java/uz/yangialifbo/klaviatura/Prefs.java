@@ -143,4 +143,24 @@ final class Prefs {
         get(c).edit().putBoolean("raqamlar_qatori", on).apply();
         bumpVersion(c);
     }
+
+    // ---- Tugmalar oralığı ----
+
+    static final String[] GAP_NAMES = {"Tor", "Oddiy", "Keng"};
+    /** {gorizontal, vertikal} dp. */
+    private static final float[][] GAPS = {{3f, 5f}, {4.5f, 7f}, {6f, 9f}};
+
+    static int gap(Context c) {
+        return get(c).getInt("oraliq", 1);
+    }
+
+    static float[] gapValues(Context c) {
+        int g = gap(c);
+        return GAPS[Math.max(0, Math.min(GAPS.length - 1, g))];
+    }
+
+    static void setGap(Context c, int index) {
+        get(c).edit().putInt("oraliq", index).apply();
+        bumpVersion(c);
+    }
 }

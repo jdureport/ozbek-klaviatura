@@ -102,6 +102,12 @@ public class SettingsActivity extends Activity {
             preview.loadSizes();
         }));
         size.addView(ui.divider());
+        size.addView(ui.row("Tugmalar oralığı", null, null, null));
+        size.addView(ui.segmented(Prefs.GAP_NAMES, Prefs.gap(this), i -> {
+            Prefs.setGap(this, i);
+            preview.loadSizes();
+        }));
+        size.addView(ui.divider());
         size.addView(ui.row("Pastdan qöşimça joy",
                 "Telefonning ∨ va 🌐 tugmalari klaviaturaga tegib tursa, oşiring", null, null));
         String[] gaps = new String[Prefs.EXTRA_BOTTOM.length];
