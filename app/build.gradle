@@ -9,7 +9,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = 'uz.yangialifbo.klaviatura'
+        applicationId = 'uz.volontyor.klaviatura'
         minSdk = 26
         targetSdk = 36
         versionCode = buildNumber
