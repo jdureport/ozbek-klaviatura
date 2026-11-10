@@ -54,8 +54,8 @@ jobs:
       - name: Reliz çiqariş
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.2.${{ github.run_number }}
-          name: Özbek klaviatura 0.2.${{ github.run_number }}
+          tag_name: v1.0.${{ github.run_number }}
+          name: Özbek klaviatura 1.0.${{ github.run_number }}
           files: |
             ozbek-klaviatura.apk
             ozbek-klaviatura-play.aab
