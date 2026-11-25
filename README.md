@@ -2,6 +2,9 @@
 
 Özbek tilining 2026-yilgi lotin alifbosi uçun Android klaviaturasi: 28 harf va ʼ belgisi.
 
+[![Google Play](https://img.shields.io/badge/Google_Play-Yuklab_oliş-0E7C74?style=for-the-badge&logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=uz.volontyor.klaviatura)
+[![Sayt](https://img.shields.io/badge/Sayt-klaviatura.volontyor.uz-14211F?style=for-the-badge)](https://klaviatura.volontyor.uz)
+
 ```
 1 2 3 4 5 6 7 8 9 0
 q e r t y u i o ö p
@@ -11,6 +14,8 @@ a s ş d f g ğ h j k l
 ```
 
 ## Yuklab oliş
+
+Eng qulay yöli — [Google Play](https://play.google.com/store/apps/details?id=uz.volontyor.klaviatura).
 
 Har bir özgarişdan keyin GitHub Actions APK'ni avtomatik yiğadi. Tayyor faylni **Releases** böliminden `ozbek-klaviatura.apk` nomi bilan yuklab olasiz.
 
